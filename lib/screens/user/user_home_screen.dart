@@ -207,22 +207,27 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
               const SizedBox(height: 16.0),
               // مطاعم موصى بها
               Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
+                  const SectionTitle(title: "افضل المطاعم"),
                   InkWell(
                     onTap: () {},
-                    child:const Row(
+                    child: const Row(
                       children: [
-                        Icon(Icons.arrow_back_ios,color: Colors.orange,size: 18.0,),
                         Text(
                           'المزيد',
                           style: TextStyle(color: Colors.orange),
                         ),
+                        SizedBox(width: 4),
+                        Icon(
+                          Icons.arrow_back_ios,
+                          color: Colors.orange,
+                          size: 18.0,
+                        ),
                       ],
-                    )
+                    ),
                   ),
-                  const Expanded(child: SectionTitle(title: "افضل المطاعم")),
                 ],
               ),
               const SizedBox(height: 8.0),
