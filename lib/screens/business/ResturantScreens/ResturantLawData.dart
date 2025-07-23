@@ -14,6 +14,7 @@ class RestaurantLegalData {
   final String? crPhotoBack;
   final String? vatPhotoFront;
   final String? vatPhotoBack;
+  final String? profileImage; // إضافة حقل الصورة الشخصية
 
   RestaurantLegalData({
     required this.includesVat,
@@ -25,6 +26,7 @@ class RestaurantLegalData {
     this.crPhotoBack,
     this.vatPhotoFront,
     this.vatPhotoBack,
+    this.profileImage,
   });
 
   RestaurantLegalData copyWith({
@@ -37,6 +39,7 @@ class RestaurantLegalData {
     String? crPhotoBack,
     String? vatPhotoFront,
     String? vatPhotoBack,
+    String? profileImage,
   }) {
     return RestaurantLegalData(
       includesVat: includesVat ?? this.includesVat,
@@ -48,20 +51,22 @@ class RestaurantLegalData {
       crPhotoBack: crPhotoBack ?? this.crPhotoBack,
       vatPhotoFront: vatPhotoFront ?? this.vatPhotoFront,
       vatPhotoBack: vatPhotoBack ?? this.vatPhotoBack,
+      profileImage: profileImage ?? this.profileImage,
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'includes_vat': includesVat,
-        'owner_id_front': ownerIdFront,
-        'owner_id_back': ownerIdBack,
-        'restaurant_license_front': restaurantLicenseFront,
-        'restaurant_license_back': restaurantLicenseBack,
-        'cr_photo_front': crPhotoFront,
-        'cr_photo_back': crPhotoBack,
-        'vat_photo_front': vatPhotoFront,
-        'vat_photo_back': vatPhotoBack,
-      };
+    'includes_vat': includesVat,
+    'owner_id_front': ownerIdFront,
+    'owner_id_back': ownerIdBack,
+    'restaurant_license_front': restaurantLicenseFront,
+    'restaurant_license_back': restaurantLicenseBack,
+    'cr_photo_front': crPhotoFront,
+    'cr_photo_back': crPhotoBack,
+    'vat_photo_front': vatPhotoFront,
+    'vat_photo_back': vatPhotoBack,
+    'profile_image': profileImage,
+  };
 }
 
 class ResturantLawData extends StatefulWidget {
@@ -99,6 +104,69 @@ class _ResturantLawDataState extends State<ResturantLawData> {
       debugPrint('Submitting data: ${_formData.toJson()}');
       context.push('/ResturantInformation', extra: _formData);
     }
+  }
+
+  Widget _buildProfileImageSection() {
+    return Column(
+      children: [
+        const SizedBox(height: 20),
+        Center(
+          child: Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.grey[300],
+                  border: Border.all(color: Colors.grey[400]!, width: 2),
+                ),
+                child: ClipOval(
+                  child: _formData.profileImage != null
+                      ? Image.network(
+                    _formData.profileImage!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                    const Icon(Icons.person, size: 50, color: Colors.grey),
+                  )
+                      : const Icon(Icons.person, size: 50, color: Colors.grey),
+                ),
+              ),
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: GestureDetector(
+                  onTap: () => _pickFile('profileImage'),
+                  child: Container(
+                    width: 30,
+                    height: 30,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.orange,
+                    ),
+                    child: const Icon(
+                      Icons.camera_alt,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'إضافة صورة شخصية',
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey,
+          ),
+        ),
+        const SizedBox(height: 24),
+      ],
+    );
   }
 
   Widget _buildVatToggle() {
@@ -159,17 +227,17 @@ class _ResturantLawDataState extends State<ResturantLawData> {
         SectionTitle(title: title),
         const SizedBox(height: 12),
         ...fields.map((field) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Directionality(
-                textDirection: TextDirection.ltr,
-                child: ImagePickerRow(
-                  label: field['label']!,
-                  icon: Icons.image_outlined,
-                  fieldIdentifier: field['field']!,
-                  onTap: () => _pickFile(field['field']!),
-                ),
-              ),
-            )),
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: ImagePickerRow(
+              label: field['label']!,
+              icon: Icons.image_outlined,
+              fieldIdentifier: field['field']!,
+              onTap: () => _pickFile(field['field']!),
+            ),
+          ),
+        )),
       ],
     );
   }
@@ -177,65 +245,82 @@ class _ResturantLawDataState extends State<ResturantLawData> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Color(0XFFF5F5F5),
       appBar: AppBar(
-        title: const Text('المستندات المطلوبة'),
+        title: const Text('المستندات المطلوبة', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 1,
       ),
-      body: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Directionality(
-            textDirection: TextDirection.rtl,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildImageSection('صور هوية المالك', [
-                  {'label': 'صورة أمامية', 'field': 'ownerIdFront'},
-                  {'label': 'صورة خلفية', 'field': 'ownerIdBack'},
-                ]),
-                const SizedBox(height: 24),
-                _buildImageSection('صور رخصة المطعم', [
-                  {'label': 'صورة أمامية', 'field': 'restaurantLicenseFront'},
-                  {'label': 'صورة خلفية', 'field': 'restaurantLicenseBack'},
-                ]),
-                const SizedBox(height: 24),
-                _buildImageSection('صور السجل التجاري', [
-                  {'label': 'صورة أمامية', 'field': 'crPhotoFront'},
-                  {'label': 'صورة خلفية', 'field': 'crPhotoBack'},
-                ]),
-                const SizedBox(height: 24),
-                _buildVatToggle(),
-                const SizedBox(height: 24),
-                _buildImageSection('صور ضريبة القيمة المضافة', [
-                  {'label': 'صورة أمامية', 'field': 'vatPhotoFront'},
-                  {'label': 'صورة خلفية', 'field': 'vatPhotoBack'},
-                ]),
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _submitForm,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+      body: Padding(
+        padding: const EdgeInsets.only(left: 20.0, right: 20.0, top: 10.0),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.all(Radius.circular(16)),
+          ),
+          child: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Directionality(
+                textDirection: TextDirection.rtl,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildProfileImageSection(),
+                    _buildImageSection('صور هوية المالك', [
+                      {'label': 'صورة أمامية', 'field': 'ownerIdFront'},
+                      {'label': 'صورة خلفية', 'field': 'ownerIdBack'},
+                    ]),
+                    const SizedBox(height: 24),
+                    _buildImageSection('صور رخصة المطعم', [
+                      {'label': 'صورة أمامية', 'field': 'restaurantLicenseFront'},
+                      {'label': 'صورة خلفية', 'field': 'restaurantLicenseBack'},
+                    ]),
+                    const SizedBox(height: 24),
+                    _buildImageSection('صور السجل التجاري', [
+                      {'label': 'صورة أمامية', 'field': 'crPhotoFront'},
+                      {'label': 'صورة خلفية', 'field': 'crPhotoBack'},
+                    ]),
+                    const SizedBox(height: 24),
+                    _buildVatToggle(),
+                    const SizedBox(height: 24),
+                    _buildImageSection('صور ضريبة القيمة المضافة', [
+                      {'label': 'صورة أمامية', 'field': 'vatPhotoFront'},
+                      {'label': 'صورة خلفية', 'field': 'vatPhotoBack'},
+                    ]),
+                    const SizedBox(height: 32),
+                    // إضافة مساحة إضافية قبل الزرار
+                    Padding(
+                      padding: EdgeInsets.only(
+                        bottom: MediaQuery.of(context).viewPadding.bottom + 16,
+                      ),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _submitForm,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                            padding: const EdgeInsets.symmetric(vertical: 15),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            'التالي',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                    child: const Text(
-                      'متابعة',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),

@@ -20,10 +20,10 @@ class RestaurantAvailabilitySwitch extends StatelessWidget {
           Switch(
             value: isAvailable,
             onChanged: onChanged,
-            activeColor: Colors.green,
+            activeColor: Color(0xFFFC8700),
           ),
           const Text(
-            "هل أنت متاح لاستلام الطلبات",
+            "هل انت متاح لاستلام الطلبات",
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,

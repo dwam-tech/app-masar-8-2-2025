@@ -5,7 +5,7 @@ import 'package:saba2v2/models/order_model.dart';
 class OrderCard extends StatelessWidget {
   final OrderModel order;
   final Function(OrderModel) onViewDetails;
-  
+
   const OrderCard({
     super.key,
     required this.order,
@@ -44,29 +44,13 @@ class OrderCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // معلومات الطلب
+          // معلومات الطلب - حالة الطلب والوقت
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // الوقت والحالة
-                Flexible(
-                  child: Row(
-                    children: [
-                      const Icon(Icons.access_time, size: 16, color: Colors.grey),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          DateFormat('dd/MM/yyyy - hh:mm a').format(order.orderTime),
-                          style: const TextStyle(color: Colors.grey, fontSize: 12),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // حالة الطلب
+                // حالة الطلب على الشمال
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
@@ -82,20 +66,32 @@ class OrderCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                // الوقت على اليمين
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      DateFormat('dd/MM/yyyy - hh:mm a').format(order.orderTime),
+                      style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.access_time, size: 16, color: Colors.grey),
+                  ],
+                ),
               ],
             ),
           ),
-          
-          // معلومات العميل والسعر
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // السعر
-                Row(
+
+          // السعر
+          Row(
+            mainAxisAlignment: MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    const Icon(Icons.attach_money, size: 16, color: Colors.grey),
                     Text(
                       "${order.totalAmount.toStringAsFixed(0)} ج.م",
                       style: const TextStyle(
@@ -103,54 +99,56 @@ class OrderCard extends StatelessWidget {
                         fontSize: 14,
                       ),
                     ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.money, size: 16, color: Colors.amber),
                   ],
                 ),
-                
-                // معلومات العميل
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 8),
+
+          // معلومات العميل
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
                 Flexible(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          order.customerName,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      CircleAvatar(
-                        radius: 16,
-                        backgroundImage: AssetImage(order.customerImage),
-                        onBackgroundImageError: (exception, stackTrace) {
-                          // معالجة خطأ تحميل الصورة
-                        },
-                        child: const Icon(Icons.person, size: 16, color: Colors.grey),
-                      ),
-                    ],
+                  child: Text(
+                    order.customerName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
+                ),
+                const SizedBox(width: 8),
+                CircleAvatar(
+                  radius: 16,
+                  backgroundImage: AssetImage(order.customerImage),
+                  onBackgroundImageError: (exception, stackTrace) {
+                    // معالجة خطأ تحميل الصورة
+                  },
+                  child: const Icon(Icons.person, size: 16, color: Colors.grey),
                 ),
               ],
             ),
           ),
-          
+
           // رقم الطلب
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Flexible(
-                  child: Text(
-                    "#${order.id}",
-                    style: const TextStyle(
-                      color: Colors.grey,
-                      fontSize: 12,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                Text(
+                  "#${order.id}",
+                  style: const TextStyle(
+                    color: Colors.grey,
+                    fontSize: 12,
                   ),
                 ),
                 const SizedBox(width: 4),
@@ -164,12 +162,17 @@ class OrderCard extends StatelessWidget {
               ],
             ),
           ),
-          
+
           // زر عرض الطلب
           InkWell(
             onTap: () => onViewDetails(order),
+            borderRadius: const BorderRadius.only(
+              bottomLeft: Radius.circular(12),
+              bottomRight: Radius.circular(12),
+            ),
             child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
+              height: 45,
+              width: double.infinity,
               decoration: BoxDecoration(
                 color: Colors.orange.withOpacity(0.1),
                 borderRadius: const BorderRadius.only(
@@ -178,25 +181,21 @@ class OrderCard extends StatelessWidget {
                 ),
               ),
               child: const Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Padding(
-                    padding: EdgeInsets.only(right: 12),
-                    child: Icon(
-                      Icons.arrow_back_ios,
-                      size: 16,
+                  Text(
+                    "عرض الطلب",
+                    style: TextStyle(
                       color: Colors.orange,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
                     ),
                   ),
-                  Padding(
-                    padding: EdgeInsets.only(left: 12),
-                    child: Text(
-                      "عرض الطلب",
-                      style: TextStyle(
-                        color: Colors.orange,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                  SizedBox(width: 8),
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    size: 16,
+                    color: Colors.orange,
                   ),
                 ],
               ),

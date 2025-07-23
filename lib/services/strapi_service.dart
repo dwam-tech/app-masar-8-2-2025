@@ -4,7 +4,7 @@ import 'package:http_parser/http_parser.dart';
 import 'package:mime/mime.dart';
 
 class StrapiService {
-  static const String baseUrl = 'http://192.168.1.12:1337';
+  static const String baseUrl = 'http://192.168.1.28:1337';
 
   /// API token with full privileges used for pre-account actions.
   static const String adminApiToken =

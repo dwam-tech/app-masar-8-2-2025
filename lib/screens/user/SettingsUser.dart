@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
-class SettingsProvider extends StatefulWidget {
-  const SettingsProvider({super.key});
+class SettingsUser extends StatefulWidget {
+  const SettingsUser({super.key});
 
   @override
-  State<SettingsProvider> createState() => _SettingsProviderState();
+  State<SettingsUser> createState() => _SettingsUserState();
 }
 
-class _SettingsProviderState extends State<SettingsProvider> {
+class _SettingsUserState extends State<SettingsUser> {
   bool isArabic = true; // متغير لتتبع اللغة الحالية
 
   @override
@@ -19,12 +19,6 @@ class _SettingsProviderState extends State<SettingsProvider> {
     final orangeColor = const Color(0xFFFC8700);
 
     final items = [
-      _SettingsItem(
-        label: "تعديل البيانات",
-        svgPath: "assets/icons/user.svg",
-        trailing: Icons.chevron_left,
-        router: '/RestaurantEditProfile',
-      ),
       _SettingsItem(
         label: "تغيير كلمة المرور",
         svgPath: "assets/icons/lock.svg",
@@ -91,7 +85,18 @@ class _SettingsProviderState extends State<SettingsProvider> {
           centerTitle: true,
           iconTheme: const IconThemeData(color: Colors.black),
         ),
-        bottomNavigationBar: _buildBottomNavigationBar(context, isTablet),
+        bottomNavigationBar: MyBottomNavBar(
+          currentIndex: 3, // Set statically to 3 for Settings
+          onTap: (index) {
+            print('Tapped index: $index');
+          },
+          routes: [
+            '/UserHomeScreen', // الرئيسية
+            null, // السلة
+            null, // طلباتي
+            '/SettingsUser', // الإعدادات
+          ],
+        ),
         body: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
@@ -121,7 +126,7 @@ class _SettingsProviderState extends State<SettingsProvider> {
                                 item.svgPath,
                                 width: 24,
                                 height: 24,
-                                color: orangeColor,
+                                colorFilter: ColorFilter.mode(orangeColor, BlendMode.srcIn),
                               ),
                               title: Text(
                                 item.label,
@@ -158,7 +163,6 @@ class _SettingsProviderState extends State<SettingsProvider> {
                         ],
                       ),
                       const SizedBox(height: 36),
-                      // زرار تسجيل الخروج
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
@@ -166,10 +170,14 @@ class _SettingsProviderState extends State<SettingsProvider> {
                           icon: const Icon(Icons.logout, color: Colors.white, size: 20),
                           label: const Text(
                             "تسجيل الخروج",
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: Colors.white,
+                            ),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
+                            backgroundColor: orangeColor,
                             padding: const EdgeInsets.symmetric(vertical: 15),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -246,32 +254,89 @@ class _SettingsProviderState extends State<SettingsProvider> {
       ),
     );
   }
+}
 
-  Widget _buildBottomNavigationBar(BuildContext context, bool isTablet) {
-    int currentIndex = 3; // القائمة
+class _SettingsItem {
+  final String label;
+  final String svgPath;
+  final IconData? trailing;
+  final Widget? customWidget;
+  final String router;
+  _SettingsItem({
+    required this.label,
+    required this.svgPath,
+    required this.router,
+    this.trailing,
+    this.customWidget,
+  });
+}
 
-    void onItemTapped(int index) {
-      switch (index) {
-        case 0:
-          context.go('/restaurant-home');
-          break;
-        case 1:
-          context.go('/Menu');
-          break;
-        case 2:
-          context.go('/RestaurantAnalysisScreen');
-          break;
-        case 3:
-          context.go('/SettingsProvider');
-          break;
-      }
-    }
+class _SocialIcon extends StatelessWidget {
+  final String svgPath;
+  const _SocialIcon({required this.svgPath});
 
-    final List<Map<String, String>> navIcons = [
-      {"svg": "assets/icons/home_icon_provider.svg", "label": "الرئيسية"},
-      {"svg": "assets/icons/Nav_Menu_provider.svg", "label": "القائمة"},
-      {"svg": "assets/icons/Nav_Analysis_provider.svg", "label": "الإحصائيات"},
-      {"svg": "assets/icons/Settings.svg", "label": "الإعدادات"},
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F7F7),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(12),
+      child: SvgPicture.asset(
+        svgPath,
+        width: 28,
+        height: 28,
+      ),
+    );
+  }
+}
+
+class MyBottomNavBar extends StatelessWidget {
+  final int currentIndex;
+  final Function(int) onTap;
+  final List<String?> routes;
+
+  const MyBottomNavBar({
+    super.key,
+    required this.currentIndex,
+    required this.onTap,
+    this.routes = const [],
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isTablet = MediaQuery.of(context).size.width >= 768;
+    final orangeColor = const Color(0xFFFC8700);
+
+    final List<Map<String, dynamic>> navItems = [
+      {
+        'icon': 'assets/icons/home_icon_provider.svg',
+        'label': 'الرئيسية',
+        'route': routes.isNotEmpty && routes.length > 0 ? routes[0] : null,
+      },
+      {
+        'icon': 'assets/icons/cart.svg',
+        'label': 'السلة',
+        'route': routes.isNotEmpty && routes.length > 1 ? routes[1] : null,
+      },
+      {
+        'icon': 'assets/icons/Nav_Menu_provider.svg',
+        'label': 'طلباتي',
+        'route': routes.isNotEmpty && routes.length > 2 ? routes[2] : null,
+      },
+      {
+        'icon': 'assets/icons/menu.svg',
+        'label': 'الإعدادات',
+        'route': routes.isNotEmpty && routes.length > 3 ? routes[3] : null,
+      },
     ];
 
     return Directionality(
@@ -295,13 +360,20 @@ class _SettingsProviderState extends State<SettingsProvider> {
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: List.generate(navIcons.length, (idx) {
-                final item = navIcons[idx];
-                final selected = idx == currentIndex;
-                Color mainColor = selected ? Colors.orange : const Color(0xFF6B7280);
+              children: navItems.asMap().entries.map((entry) {
+                final index = entry.key;
+                final item = entry.value;
+                final selected = index == currentIndex;
+                final mainColor = selected ? orangeColor : const Color(0xFF6B7280);
 
                 return InkWell(
-                  onTap: () => onItemTapped(idx),
+                  onTap: () {
+                    if (item['route'] != null) {
+                      context.go(item['route']);
+                    } else {
+                      onTap(index);
+                    }
+                  },
                   borderRadius: BorderRadius.circular(16),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
@@ -310,21 +382,21 @@ class _SettingsProviderState extends State<SettingsProvider> {
                       vertical: isTablet ? 12 : 10,
                     ),
                     decoration: BoxDecoration(
-                      color: selected ? Colors.orange.withOpacity(0.1) : Colors.transparent,
+                      color: selected ? orangeColor.withOpacity(0.1) : Colors.transparent,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         SvgPicture.asset(
-                          item["svg"]!,
+                          item['icon'],
                           height: isTablet ? 28 : 24,
                           width: isTablet ? 28 : 24,
                           colorFilter: ColorFilter.mode(mainColor, BlendMode.srcIn),
                         ),
                         SizedBox(height: isTablet ? 8 : 6),
                         Text(
-                          item["label"]!,
+                          item['label'],
                           style: TextStyle(
                             fontSize: isTablet ? 14 : 12,
                             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
@@ -335,52 +407,10 @@ class _SettingsProviderState extends State<SettingsProvider> {
                     ),
                   ),
                 );
-              }),
+              }).toList(),
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _SettingsItem {
-  final String label;
-  final String svgPath;
-  final IconData? trailing;
-  final Widget? customWidget;
-  final String router;
-  _SettingsItem({
-    required this.label,
-    required this.svgPath,
-    required this.router,
-    this.trailing,
-    this.customWidget,
-  });
-}
-
-class _SocialIcon extends StatelessWidget {
-  final String svgPath;
-  const _SocialIcon({required this.svgPath});
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F7F7),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(12),
-      child: SvgPicture.asset(
-        svgPath,
-        width: 28,
-        height: 28,
       ),
     );
   }

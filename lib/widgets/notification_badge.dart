@@ -13,7 +13,7 @@ class NotificationBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(top: 8, right: 8),
+
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: backgroundColor,

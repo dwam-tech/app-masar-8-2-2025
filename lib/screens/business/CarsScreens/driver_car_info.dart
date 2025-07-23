@@ -103,31 +103,32 @@ class _DriverCarInfoState extends State<DriverCarInfo> {
 
   // Form Submission
   void _onSubmit() {
-    if (_formKey.currentState!.validate()) {
-      final data = {
-        'drivingLicenseImages': {
-          'frontImage': _licenseFrontImagePath,
-          'backImage': _licenseBackImagePath,
-        },
-        'carRegistrationImages': {
-          'frontImage': _carRegistrationFrontImagePath,
-          'backImage': _carRegistrationBackImagePath,
-        },
-        'carImages': {
-          'frontImage': _carFrontImagePath,
-          'backImage': _carBackImagePath,
-        },
-        'carInfo': {
-          'carType': _carType,
-          'carModel': _carModelController.text,
-          'color': _colorController.text,
-          'plateNumber': _plateNumberController.text,
-        },
-      };
-      
-      debugPrint('Submitted Car Info: $data');
-      context.push('/confirmation', extra: data);
-    }
+    // if (_formKey.currentState!.validate()) {
+    //   final data = {
+    //     'drivingLicenseImages': {
+    //       'frontImage': _licenseFrontImagePath,
+    //       'backImage': _licenseBackImagePath,
+    //     },
+    //     'carRegistrationImages': {
+    //       'frontImage': _carRegistrationFrontImagePath,
+    //       'backImage': _carRegistrationBackImagePath,
+    //     },
+    //     'carImages': {
+    //       'frontImage': _carFrontImagePath,
+    //       'backImage': _carBackImagePath,
+    //     },
+    //     'carInfo': {
+    //       'carType': _carType,
+    //       'carModel': _carModelController.text,
+    //       'color': _colorController.text,
+    //       'plateNumber': _plateNumberController.text,
+    //     },
+    //   };
+    //
+    //   debugPrint('Submitted Car Info: $data');
+    //   context.push('/confirmation', extra: data);
+    // }
+    context.go('/RealStateHomeScreen');
   }
 
   // Reusable Widgets

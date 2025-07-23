@@ -13,7 +13,7 @@ void main() async {
   // تهيئة مدير الحالة
   final authProvider = AuthProvider();
   await authProvider.initialize();
-  
+
   runApp(
     MultiProvider(
       providers: [
@@ -23,42 +23,40 @@ void main() async {
         ChangeNotifierProvider(create: (_) => RealEstateProvider()),
       ],
       child: MaterialApp.router(
-        title: 'تطبيق سابا',
+        title: 'تطبيق مسار',
         theme: ThemeData(
           primarySwatch: Colors.orange,
           fontFamily: 'Cairo',
           scaffoldBackgroundColor: Colors.white,
+          textTheme: const TextTheme(
+            displayLarge: TextStyle(fontFamily: 'Cairo'),
+            displayMedium: TextStyle(fontFamily: 'Cairo'),
+            displaySmall: TextStyle(fontFamily: 'Cairo'),
+            headlineLarge: TextStyle(fontFamily: 'Cairo'),
+            headlineMedium: TextStyle(fontFamily: 'Cairo'),
+            headlineSmall: TextStyle(fontFamily: 'Cairo'),
+            titleLarge: TextStyle(fontFamily: 'Cairo'),
+            titleMedium: TextStyle(fontFamily: 'Cairo'),
+            titleSmall: TextStyle(fontFamily: 'Cairo'),
+            bodyLarge: TextStyle(fontFamily: 'Cairo'),
+            bodyMedium: TextStyle(fontFamily: 'Cairo'),
+            bodySmall: TextStyle(fontFamily: 'Cairo'),
+            labelLarge: TextStyle(fontFamily: 'Cairo'),
+            labelMedium: TextStyle(fontFamily: 'Cairo'),
+            labelSmall: TextStyle(fontFamily: 'Cairo'),
+          ),
         ),
         routerConfig: AppRouter.createRouter(authProvider),
         debugShowCheckedModeBanner: false,
-        locale: const Locale('ar', 'SA'),
+        locale: const Locale('ar', 'EG'),
+        // هنا الإضافة لمنع تكبير/تصغير الخط من السيستم
+        builder: (context, child) {
+          return MediaQuery(
+            data: MediaQuery.of(context).copyWith(textScaleFactor: 1.0),
+            child: child!,
+          );
+        },
       ),
-    )
+    ),
   );
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => ServiceCategoryProvider()),
-        ChangeNotifierProvider(create: (_) => RestaurantProvider()),
-        ChangeNotifierProvider(create: (_) => RealEstateProvider()),
-      ],
-      child: MaterialApp.router(
-        title: 'تطبيق سابا',
-        theme: ThemeData(
-          primarySwatch: Colors.orange,
-          fontFamily: 'Cairo',
-          scaffoldBackgroundColor: Colors.white,
-        ),
-        routerConfig: AppRouter.createRouter(AuthProvider()),
-        debugShowCheckedModeBanner: false,
-        locale: const Locale('ar', 'SA'),
-      ),
-    );
-  }
 }

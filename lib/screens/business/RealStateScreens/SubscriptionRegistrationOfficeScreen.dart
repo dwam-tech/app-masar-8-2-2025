@@ -1,9 +1,11 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'dart:io';
+import 'package:http/http.dart' as http;
 import 'package:saba2v2/components/UI/image_picker_row.dart';
 import 'package:saba2v2/components/UI/section_title.dart';
 import 'package:saba2v2/providers/auth_provider.dart';
@@ -28,13 +30,21 @@ class _SubscriptionRegistrationOfficeScreenState
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _ConfirmPasswordController = TextEditingController();
-  // State for image paths
+
+  // State for local image paths and uploaded URLs
   String? _officeLogoPath;
   String? _ownerIdFrontPath;
   String? _ownerIdBackPath;
   String? _officePhotoFrontPath;
   String? _crPhotoFrontPath;
   String? _crPhotoBackPath;
+
+  String? _officeLogoUrl;
+  String? _ownerIdFrontImageUrl;
+  String? _ownerIdBackImageUrl;
+  String? _officeImageUrl;
+  String? _commercialRegisterFrontImageUrl;
+  String? _commercialRegisterBackImageUrl;
 
   String? _selectedCity;
   final List<String> _cities = [
@@ -50,14 +60,13 @@ class _SubscriptionRegistrationOfficeScreenState
     'حائل',
   ];
 
+  // Base URL for the Laravel API
+  static const String _baseUrl = 'http://192.168.1.7:8000'; // Replace with your actual API base URL
+
   Future<void> _pickFile(String fieldName) async {
-    // On Android 13+ the `photos` permission maps to READ_MEDIA_IMAGES.
-    // Older Android versions still rely on the storage permission so we
-    // request both when necessary. iOS only requires the photos permission.
     PermissionStatus status = await Permission.photos.request();
 
     if (!status.isGranted && Platform.isAndroid) {
-      // Fallback for Android 12 and below
       status = await Permission.storage.request();
     }
 
@@ -75,7 +84,7 @@ class _SubscriptionRegistrationOfficeScreenState
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('لم يتم العثور على صور. تأكد من وجود صور على الجهاز أو في المحاكي')),
+              content: Text('لم يتم العثور على صور. تأكد من وجود صور على الجهاز')),
         );
       }
       return;
@@ -105,6 +114,57 @@ class _SubscriptionRegistrationOfficeScreenState
             break;
         }
       });
+
+      // Upload the image immediately
+      final url = await _uploadFile(path, fieldName);
+      if (url != null) {
+        setState(() {
+          switch (fieldName) {
+            case 'officeLogo':
+              _officeLogoUrl = url;
+              break;
+            case 'ownerIdFront':
+              _ownerIdFrontImageUrl = url;
+              break;
+            case 'ownerIdBack':
+              _ownerIdBackImageUrl = url;
+              break;
+            case 'officePhotoFront':
+              _officeImageUrl = url;
+              break;
+            case 'crPhotoFront':
+              _commercialRegisterFrontImageUrl = url;
+              break;
+            case 'crPhotoBack':
+              _commercialRegisterBackImageUrl = url;
+              break;
+          }
+        });
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('فشل رفع الصورة: $fieldName. الرجاء المحاولة مرة أخرى')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<String?> _uploadFile(String filePath, String fieldName) async {
+    try {
+      var request = http.MultipartRequest('POST', Uri.parse('$_baseUrl/api/upload'));
+      request.files.add(await http.MultipartFile.fromPath('image', filePath));
+      var response = await request.send();
+      if (response.statusCode == 200) {
+        var responseData = await response.stream.bytesToString();
+        var jsonResponse = jsonDecode(responseData);
+        return jsonResponse['imageUrl'] as String?; // Assuming API returns { "imageUrl": "url" }
+      } else {
+        return null;
+      }
+    } catch (e) {
+      print('Upload error for $fieldName: $e');
+      return null;
     }
   }
 
@@ -113,21 +173,27 @@ class _SubscriptionRegistrationOfficeScreenState
       switch (fieldName) {
         case 'officeLogo':
           _officeLogoPath = null;
+          _officeLogoUrl = null;
           break;
         case 'ownerIdFront':
           _ownerIdFrontPath = null;
+          _ownerIdFrontImageUrl = null;
           break;
         case 'ownerIdBack':
           _ownerIdBackPath = null;
+          _ownerIdBackImageUrl = null;
           break;
         case 'officePhotoFront':
           _officePhotoFrontPath = null;
+          _officeImageUrl = null;
           break;
         case 'crPhotoFront':
           _crPhotoFrontPath = null;
+          _commercialRegisterFrontImageUrl = null;
           break;
         case 'crPhotoBack':
           _crPhotoBackPath = null;
+          _commercialRegisterBackImageUrl = null;
           break;
       }
     });
@@ -143,15 +209,15 @@ class _SubscriptionRegistrationOfficeScreenState
     }
 
     if ([
-          _officeLogoPath,
-          _ownerIdFrontPath,
-          _ownerIdBackPath,
-          _officePhotoFrontPath,
-          _crPhotoFrontPath,
-          _crPhotoBackPath
-        ].any((p) => p == null)) {
+      _officeLogoUrl,
+      _ownerIdFrontImageUrl,
+      _ownerIdBackImageUrl,
+      _officeImageUrl,
+      _commercialRegisterFrontImageUrl,
+      _commercialRegisterBackImageUrl
+    ].any((url) => url == null)) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('الرجاء اختيار جميع الصور')));
+          .showSnackBar(const SnackBar(content: Text('الرجاء رفع جميع الصور')));
       return;
     }
 
@@ -164,17 +230,17 @@ class _SubscriptionRegistrationOfficeScreenState
       city: _selectedCity!,
       address: _addressController.text.trim(),
       vat: _includesVat,
-      officeLogoPath: _officeLogoPath!,
-      ownerIdFrontPath: _ownerIdFrontPath!,
-      ownerIdBackPath: _ownerIdBackPath!,
-      officeImagePath: _officePhotoFrontPath!,
-      commercialCardFrontPath: _crPhotoFrontPath!,
-      commercialCardBackPath: _crPhotoBackPath!,
+      officeLogoPath: _officeLogoUrl!,
+      ownerIdFrontPath: _ownerIdFrontImageUrl!,
+      ownerIdBackPath: _ownerIdBackImageUrl!,
+      officeImagePath: _officeImageUrl!,
+      commercialCardFrontPath: _commercialRegisterFrontImageUrl!,
+      commercialCardBackPath: _commercialRegisterBackImageUrl!,
     );
 
-    if (result['success']) {
+    if (result['status']) {
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم انشاء الحساب بنجاح'), backgroundColor: Colors.green));
+          const SnackBar(content: Text('تم إنشاء الحساب بنجاح'), backgroundColor: Colors.green));
       if (mounted) {
         context.go('/RealStateHomeScreen');
       }
@@ -231,7 +297,6 @@ class _SubscriptionRegistrationOfficeScreenState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Section 1: Office Identity
               Container(
                 width: double.infinity,
                 child: const SectionTitle(title: 'هوية المكتب'),
@@ -304,6 +369,7 @@ class _SubscriptionRegistrationOfficeScreenState
                 controller: _passwordController,
                 obscureText: true,
               ),
+              const SizedBox(height: 16),
               _buildFormField(
                 hintText: 'تأكيد كلمة السر',
                 controller: _ConfirmPasswordController,
@@ -319,7 +385,6 @@ class _SubscriptionRegistrationOfficeScreenState
                 onRemove: () => _removeFile('officeLogo'),
               ),
 
-              // Section 2: Owner ID
               Container(
                 width: double.infinity,
                 child: const SectionTitle(title: 'صور هوية المالك'),
@@ -343,7 +408,6 @@ class _SubscriptionRegistrationOfficeScreenState
                 onRemove: () => _removeFile('ownerIdBack'),
               ),
 
-              // Section 3: Office Photos
               Container(
                 width: double.infinity,
                 child: const SectionTitle(title: 'صورة المكتب'),
@@ -358,7 +422,6 @@ class _SubscriptionRegistrationOfficeScreenState
                 onRemove: () => _removeFile('officePhotoFront'),
               ),
 
-              // Section 4: Commercial Register
               Container(
                 width: double.infinity,
                 child: const SectionTitle(title: 'صور السجل التجاري'),
@@ -382,38 +445,45 @@ class _SubscriptionRegistrationOfficeScreenState
                 onRemove: () => _removeFile('crPhotoBack'),
               ),
 
-              // Section 5: VAT
               Container(
                 width: double.infinity,
                 child: const SectionTitle(title: 'الضريبة'),
               ),
               const SizedBox(height: 16),
-              SwitchListTile(
-                title: const Text('هل تشمل الأسعار ضريبة القيمة المضافة؟'),
-                value: _includesVat,
-                onChanged: (value) => setState(() => _includesVat = value),
-                activeColor: Colors.orange,
-                contentPadding: EdgeInsets.zero,
+              Directionality(
+                textDirection: TextDirection.rtl,
+                child: SwitchListTile(
+                  title: const Text('هل تشمل الأسعار ضريبة القيمة المضافة؟'),
+                  value: _includesVat,
+                  onChanged: (value) => setState(() => _includesVat = value),
+                  activeColor: Colors.orange,
+                  contentPadding: EdgeInsets.zero,
+                ),
               ),
 
-              // Submit Button
               const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _submitForm,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: const Text(
-                    'التالي',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+              Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewPadding.bottom + 16,
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _submitForm,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'التالي',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),

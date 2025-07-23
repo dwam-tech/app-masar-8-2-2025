@@ -130,8 +130,9 @@ class _ResturantWorkTimeState extends State<ResturantWorkTime> {
   }
 
   void _submitData() {
+    context.go('/restaurant-home');
     final workHours = _prepareWorkHours();
-    
+
     final completeData = {
       'legal_data': widget.legalData.toJson(),
       'account_info': widget.accountInfo.toJson(),
@@ -140,6 +141,10 @@ class _ResturantWorkTimeState extends State<ResturantWorkTime> {
 
     debugPrint('Complete Registration Data: $completeData');
     context.go('/restaurant-home');
+  }
+  void _submitDataForTest() {
+    context.go('/restaurant-home');
+
   }
 
   RestaurantWorkHours _prepareWorkHours() {
@@ -294,7 +299,7 @@ class _ResturantWorkTimeState extends State<ResturantWorkTime> {
       child: SizedBox(
         width: double.infinity,
         child: ElevatedButton(
-          onPressed: _submitData,
+          onPressed: _submitDataForTest,
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.orange,
             padding: const EdgeInsets.symmetric(vertical: 15),

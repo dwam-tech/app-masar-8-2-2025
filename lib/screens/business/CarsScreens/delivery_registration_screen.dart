@@ -72,20 +72,25 @@ class _DeliveryRegistrationScreenState extends State<DeliveryRegistrationScreen>
               _buildRadioOption('مكتب تأجير سيارات'),
               _buildRadioOption('كابتن - سائق'),
               const SizedBox(height: 30),
-              ElevatedButton(
-                onPressed: _onNextPressed,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+              Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewPadding.bottom + 16,
                 ),
-                child: const Text(
-                  'التالي',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Colors.white,
+                child: ElevatedButton(
+                  onPressed: _onNextPressed,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text(
+                    'التالي',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),

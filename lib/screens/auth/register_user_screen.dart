@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:saba2v2/providers/auth_provider.dart';
 
+import '../../providers/auth_provider.dart'; // Replace with your actual path
+
 class RegisterUserScreen extends StatefulWidget {
   const RegisterUserScreen({super.key});
 
@@ -17,15 +19,13 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  
+
   String? _selectedCity;
   bool _acceptTerms = false;
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   bool _isLoading = false;
-  // نحذف متغير _isStep1Complete لأننا سنعرض النموذج كاملاً في صفحة واحدة
-  
-  
+
   // قائمة المدن المصرية
   static const List<String> _cities = [
     'القاهرة',
@@ -74,13 +74,10 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
 
   // التحقق من صحة رقم الهاتف المصري
   bool _isValidEgyptianPhone(String phone) {
-    // إزالة المسافات والرموز
     phone = phone.replaceAll(RegExp(r'[\s\-\(\)]'), '');
-    
-    // التحقق من الأرقام المصرية
     return RegExp(r'^(010|011|012|015)\d{8}$').hasMatch(phone) ||
-           RegExp(r'^(\+2010|\+2011|\+2012|\+2015)\d{8}$').hasMatch(phone) ||
-           RegExp(r'^(0020010|0020011|0020012|0020015)\d{8}$').hasMatch(phone);
+        RegExp(r'^(\+2010|\+2011|\+2012|\+2015)\d{8}$').hasMatch(phone) ||
+        RegExp(r'^(0020010|0020011|0020012|0020015)\d{8}$').hasMatch(phone);
   }
 
   // التحقق من قوة كلمة المرور
@@ -119,7 +116,7 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
     );
   }
 
-  // تسجيل المستخدم وإنشاء app user مباشرة
+  // تسجيل المستخدم
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -141,18 +138,18 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final result = await authProvider.registerUser(
-        username: _nameController.text.trim(),
+      final result = await authProvider.registerNormalUser(
+        name: _nameController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text,
-        userPhone: _phoneController.text.trim(),
-        city: _selectedCity!,
+        phone: _phoneController.text.trim(),
+        governorate: _selectedCity!,
       );
 
-      if (result['success']) {
+      if (result['status']) {
         _showMessage('تم إكمال تسجيل الحساب بنجاح');
         if (mounted) {
-          context.go('/login');
+          context.go('/UserHomeScreen'); // Navigate to home screen after successful registration
         }
       } else {
         _showMessage(result['message'], isError: true);
@@ -172,44 +169,34 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black87),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
       body: SafeArea(
         child: Directionality(
           textDirection: TextDirection.rtl,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: Form(
-              key: _formKey,
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 20),
-                    
-                    // العنوان والوصف
-                    _buildHeader(),
-                    const SizedBox(height: 40),
-                    
-                    // عرض النموذج كاملاً
-                    _buildFullForm(),
-                    
-                    const SizedBox(height: 30),
-                    
-                    // زر التسجيل
-                    _buildRegisterButton(),
-                    const SizedBox(height: 20),
-                    
-                    // رابط تسجيل الدخول
-                    _buildLoginLink(),
-                    const SizedBox(height: 30),
-                  ],
+            padding: const EdgeInsets.symmetric(horizontal: 15.0, vertical: 22),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 15.0),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Form(
+                key: _formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 20),
+                      _buildHeader(),
+                      const SizedBox(height: 40),
+                      _buildFullForm(),
+                      const SizedBox(height: 30),
+                      _buildRegisterButton(),
+                      const SizedBox(height: 20),
+                      _buildLoginLink(),
+                      const SizedBox(height: 30),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -219,30 +206,22 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
     );
   }
 
-  // بناء النموذج كاملاً في صفحة واحدة
+  // بناء النموذج كاملاً
   Widget _buildFullForm() {
     return Column(
       children: [
-        // بيانات الخطوة الأولى
         _buildNameField(),
         const SizedBox(height: 20),
-        
         _buildEmailField(),
         const SizedBox(height: 20),
-        
-        _buildPasswordField(),
-        const SizedBox(height: 20),
-        
-        _buildConfirmPasswordField(),
-        const SizedBox(height: 20),
-        
-        // بيانات الخطوة الثانية
         _buildPhoneField(),
         const SizedBox(height: 20),
-        
         _buildCityDropdown(),
         const SizedBox(height: 20),
-        
+        _buildPasswordField(),
+        const SizedBox(height: 20),
+        _buildConfirmPasswordField(),
+        const SizedBox(height: 20),
         _buildTermsCheckbox(),
       ],
     );
@@ -252,20 +231,11 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
     return Column(
       children: [
         const Text(
-          'إنشاء حساب جديد',
+          'إنشاء الحساب',
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.bold,
             color: Colors.black87,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 10),
-        Text(
-          'أدخل بياناتك لإنشاء حساب جديد',
-          style: TextStyle(
-            fontSize: 16,
-            color: Colors.grey[600],
           ),
           textAlign: TextAlign.center,
         ),
@@ -342,7 +312,7 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
     return DropdownButtonFormField<String>(
       value: _selectedCity,
       decoration: _buildInputDecoration(
-        label: 'المحافظة',
+        label: 'اختر المحافظة',
         icon: Icons.location_city_outlined,
       ),
       isExpanded: true,
@@ -458,10 +428,10 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
               ),
               child: _acceptTerms
                   ? const Icon(
-                      Icons.check,
-                      size: 16,
-                      color: Colors.white,
-                    )
+                Icons.check,
+                size: 16,
+                color: Colors.white,
+              )
                   : null,
             ),
             const SizedBox(width: 12),
@@ -474,7 +444,6 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
                   ),
                   GestureDetector(
                     onTap: () {
-                      // فتح صفحة الشروط والأحكام
                       _showTermsDialog();
                     },
                     child: const Text(
@@ -514,20 +483,20 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
       ),
       child: _isLoading
           ? const SizedBox(
-              height: 20,
-              width: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-              ),
-            )
+        height: 20,
+        width: 20,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+        ),
+      )
           : const Text(
-              'إنشاء حساب',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+        'إنشاء حساب',
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 
@@ -535,6 +504,11 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        const Text(
+          'لديك حساب بالفعل؟',
+          style: TextStyle(color: Colors.grey),
+        ),
+        const SizedBox(width: 8),
         GestureDetector(
           onTap: () {
             context.go('/login');
@@ -547,11 +521,6 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
               decoration: TextDecoration.underline,
             ),
           ),
-        ),
-        const SizedBox(width: 8),
-        const Text(
-          'لديك حساب بالفعل؟',
-          style: TextStyle(color: Colors.grey),
         ),
       ],
     );

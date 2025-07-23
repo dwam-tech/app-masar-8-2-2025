@@ -188,14 +188,14 @@ class _DeliveryPersonInformationScreenState
                             bottom: 0,
                             left: 0,
                             child: Container(
-                              decoration: BoxDecoration(
+                              decoration: const BoxDecoration(
                                 color: Colors.white,
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
                                     color: Colors.black12,
                                     blurRadius: 2,
-                                    offset: const Offset(0, 1),
+                                    offset: Offset(0, 1),
                                   ),
                                 ],
                               ),
@@ -301,20 +301,25 @@ class _DeliveryPersonInformationScreenState
                   ),
                   const SizedBox(height: 24),
                   // Next Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  Padding(
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.of(context).viewPadding.bottom + 16,
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      onPressed: _onNextPressed,
-                      child: const Text(
-                        'التالي',
-                        style: TextStyle(color: Colors.white, fontSize: 16),
+                        onPressed: _onNextPressed,
+                        child: const Text(
+                          'التالي',
+                          style: TextStyle(color: Colors.white, fontSize: 16),
+                        ),
                       ),
                     ),
                   ),

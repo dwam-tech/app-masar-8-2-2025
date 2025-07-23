@@ -123,50 +123,51 @@ class _DeliveryOfficeInformationState extends State<DeliveryOfficeInformation> {
   // Form Submission
   void _onSubmit() {
     // Validate selection lists
-    final paymentMethodsError = _validateSelectionList(_selectedPaymentMethods, 'طريقة دفع');
-    final rentalTypesError = _validateSelectionList(_selectedRentalTypes, 'نوع تأجير');
-
-    if (_formKey.currentState!.validate() && 
-        paymentMethodsError == null && 
-        rentalTypesError == null) {
-      
-      final data = {
-        'personalInfo': {
-          'fullName': _fullNameController.text,
-          'email': _emailController.text,
-          'phone': _phoneController.text,
-          'password': _passwordController.text,
-        },
-        'officeInfo': {
-          'officeName': _officeNameController.text,
-          'logoImage': _logoImagePath,
-          'commercialRegistrationFront': _commercialRegistrationFrontPath,
-          'commercialRegistrationBack': _commercialRegistrationBackPath,
-          'deliveryCostPerKm': _deliveryCostPerKmController.text,
-          'driverCostPerDay': _driverCostController.text,
-          'maxKmPerDay': _maxKmPerDayController.text,
-        },
-        'services': {
-          'paymentMethods': _getSelectedItems(_paymentMethods, _selectedPaymentMethods),
-          'rentalTypes': _getSelectedItems(_rentalTypes, _selectedRentalTypes),
-        },
-      };
-
-      debugPrint('Office Registration Data: $data');
-      context.go('/delivery-homescreen');
-    } else {
-      // Show errors for selection lists
-      if (paymentMethodsError != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(paymentMethodsError)),
-        );
-      }
-      if (rentalTypesError != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(rentalTypesError)),
-        );
-      }
-    }
+    // final paymentMethodsError = _validateSelectionList(_selectedPaymentMethods, 'طريقة دفع');
+    // final rentalTypesError = _validateSelectionList(_selectedRentalTypes, 'نوع تأجير');
+    //
+    // if (_formKey.currentState!.validate() &&
+    //     paymentMethodsError == null &&
+    //     rentalTypesError == null) {
+    //
+    //   final data = {
+    //     'personalInfo': {
+    //       'fullName': _fullNameController.text,
+    //       'email': _emailController.text,
+    //       'phone': _phoneController.text,
+    //       'password': _passwordController.text,
+    //     },
+    //     'officeInfo': {
+    //       'officeName': _officeNameController.text,
+    //       'logoImage': _logoImagePath,
+    //       'commercialRegistrationFront': _commercialRegistrationFrontPath,
+    //       'commercialRegistrationBack': _commercialRegistrationBackPath,
+    //       'deliveryCostPerKm': _deliveryCostPerKmController.text,
+    //       'driverCostPerDay': _driverCostController.text,
+    //       'maxKmPerDay': _maxKmPerDayController.text,
+    //     },
+    //     'services': {
+    //       'paymentMethods': _getSelectedItems(_paymentMethods, _selectedPaymentMethods),
+    //       'rentalTypes': _getSelectedItems(_rentalTypes, _selectedRentalTypes),
+    //     },
+    //   };
+    //
+    //   debugPrint('Office Registration Data: $data');
+    //   context.go('/delivery-homescreen');
+    // } else {
+    //   // Show errors for selection lists
+    //   if (paymentMethodsError != null) {
+    //     ScaffoldMessenger.of(context).showSnackBar(
+    //       SnackBar(content: Text(paymentMethodsError)),
+    //     );
+    //   }
+    //   if (rentalTypesError != null) {
+    //     ScaffoldMessenger.of(context).showSnackBar(
+    //       SnackBar(content: Text(rentalTypesError)),
+    //     );
+    //   }
+    // }
+    context.go('/delivery-homescreen');
   }
 
   List<String> _getSelectedItems(List<String> items, List<bool> selections) {
@@ -441,23 +442,28 @@ class _DeliveryOfficeInformationState extends State<DeliveryOfficeInformation> {
                   const SizedBox(height: 24),
                   
                   // Submit Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _onSubmit,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        padding: const EdgeInsets.symmetric(vertical: 15),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  Padding(
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.of(context).viewPadding.bottom + 16,
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _onSubmit,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                      ),
-                      child: const Text(
-                        'انشاء الحساب',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                        child: const Text(
+                          'انشاء الحساب',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),

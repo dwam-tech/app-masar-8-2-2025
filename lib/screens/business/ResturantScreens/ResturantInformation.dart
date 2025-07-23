@@ -1088,8 +1088,43 @@ class _ResturantInformationState extends State<ResturantInformation> {
         'account_info': accountInfo,
       });
     }
-  }
 
+  }
+  void _TestSubmitForm(){
+    final accountInfo = RestaurantAccountInfo(
+      username: "tasty_egypt",
+      phone: "01012345678",
+      email: "test.restaurant@email.com",
+      password: "MySecurePass123",
+      restaurantName: "مطعم العمدة",
+      deliveryCostPerKm: "10",
+      depositAmount: "100",
+      maxPeople: "8",
+      notes: "يفضل الحجز قبل الوصول بساعتين.",
+      hasDeliveryService: true,
+      hasTableReservation: true,
+      wantsDeposit: true,
+      cuisineTypes: [
+        "شرقي",
+        "ايطالي"
+      ],
+      branches: [
+        {
+          "governorate": "القاهرة",
+          "area": "مدينة نصر"
+        },
+        {
+          "governorate": "الجيزة",
+          "area": "الدقي"
+        },
+      ],
+    );
+
+    context.push('/ResturantWorkTime', extra: {
+      'legal_data': widget.legalData,
+      'account_info': accountInfo,
+    });
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1120,7 +1155,7 @@ class _ResturantInformationState extends State<ResturantInformation> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: _submitForm,
+                    onPressed: _TestSubmitForm,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.orange,
                       padding: EdgeInsets.symmetric(vertical: 15),
@@ -1128,7 +1163,7 @@ class _ResturantInformationState extends State<ResturantInformation> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text('التالي'),
+                    child: const Text('التالي',style: TextStyle(color: Colors.white),),
                   ),
                 ),
               ],

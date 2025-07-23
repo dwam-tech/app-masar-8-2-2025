@@ -23,8 +23,11 @@ dependencies:
   url_launcher: 6.1.10
   flutter_native_splash: 2.4.6
   http: 1.4.0
-  mime: ^1.0.4
+  mime: 1.0.4
   cached_network_image: 3.3.1
+  flutter_svg: 2.0.10
+  fl_chart: 0.63.0
+  dropdown_button2: ^2.3.9
 
 dev_dependencies:
   flutter_test:
@@ -37,6 +40,7 @@ flutter:
   assets:
     - assets/images/
     - assets/fonts/
+    - assets/icons/
 
   fonts:
     - family: Cairo

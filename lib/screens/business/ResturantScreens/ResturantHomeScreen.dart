@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:saba2v2/models/order_model.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
-import 'package:saba2v2/widgets/notification_badge.dart';
+import 'package:saba2v2/models/order_model.dart';
 import 'package:saba2v2/widgets/restaurant_availability_switch.dart';
 import 'package:saba2v2/widgets/order_card.dart';
 import 'package:saba2v2/screens/business/ResturantScreens/order_details_screen.dart';
@@ -14,38 +13,68 @@ class ResturantHomeScreen extends StatefulWidget {
   State<ResturantHomeScreen> createState() => _ResturantHomeScreenState();
 }
 
-class _ResturantHomeScreenState extends State<ResturantHomeScreen> with SingleTickerProviderStateMixin {
+class _ResturantHomeScreenState extends State<ResturantHomeScreen>
+    with TickerProviderStateMixin {
   late TabController _tabController;
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
+
   bool _isAvailableForOrders = true;
-  
-  // بيانات تجريبية للطلبات
-  List<OrderModel> _orders = [];
-  
+  bool _isLoading = false;
+  late List<OrderModel> _orders;
+
+  // Track the current selected navigation item
+  int _currentIndex = 0;
+
+  // Responsive breakpoints
+  static const double _tabletBreakpoint = 768.0;
+  static const double _desktopBreakpoint = 1024.0;
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _initializeControllers();
     _loadOrders();
-    
-    // إضافة مستمع للتغييرات في التبويب المحدد
-    _tabController.addListener(() {
-      if (_tabController.indexIsChanging) {
-        setState(() {});
-      }
-    });
   }
-  
+
+  void _initializeControllers() {
+    _tabController = TabController(length: 3, vsync: this);
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
+    );
+
+    _tabController.addListener(_onTabChanged);
+    _fadeController.forward();
+  }
+
+  void _onTabChanged() {
+    if (mounted) {
+      setState(() {});
+      _fadeController.reset();
+      _fadeController.forward();
+    }
+  }
+
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
+    _fadeController.dispose();
     super.dispose();
   }
-  
-  // تحميل بيانات الطلبات (محاكاة لجلب البيانات من الخادم)
-  void _loadOrders() {
-    // هنا سيتم استبدال هذا بطلب API حقيقي
+
+  Future<void> _loadOrders() async {
+    setState(() => _isLoading = true);
+
+    // Simulate API call
+    await Future.delayed(const Duration(milliseconds: 500));
+
     _orders = [
-      // طلبات قيد الانتظار
+      // قيد الانتظار
       OrderModel(
         id: "377",
         customerName: "كريم محمد",
@@ -112,8 +141,7 @@ class _ResturantHomeScreenState extends State<ResturantHomeScreen> with SingleTi
           ),
         ],
       ),
-      
-      // طلبات قيد التنفيذ
+      // قيد التنفيذ
       OrderModel(
         id: "374",
         customerName: "محمد حسن",
@@ -158,8 +186,7 @@ class _ResturantHomeScreenState extends State<ResturantHomeScreen> with SingleTi
           ),
         ],
       ),
-      
-      // طلبات منتهية
+      // منتهية
       OrderModel(
         id: "372",
         customerName: "عمر خالد",
@@ -227,222 +254,480 @@ class _ResturantHomeScreenState extends State<ResturantHomeScreen> with SingleTi
         ],
       ),
     ];
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
   }
-  
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: _buildAppBar(),
-      body: _buildBody(),
-      bottomNavigationBar: _buildBottomNavigationBar(),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final screenWidth = constraints.maxWidth;
+        final isTablet = screenWidth >= _tabletBreakpoint;
+        final isDesktop = screenWidth >= _desktopBreakpoint;
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFF8F9FA),
+          body: SafeArea(
+            child: Column(
+              children: [
+                _buildAppBar(context, isTablet),
+                Expanded(
+                  child: _buildMainContent(context, isTablet, isDesktop),
+                ),
+              ],
+            ),
+          ),
+          bottomNavigationBar: _buildBottomNavigationBar(context, isTablet),
+        );
+      },
     );
   }
-  
-  // بناء شريط التطبيق
-  PreferredSizeWidget _buildAppBar() {
-    return AppBar(
-      title: const Text(
-        "الرئيسية",
-        style: TextStyle(fontWeight: FontWeight.bold),
+
+  Widget _buildAppBar(BuildContext context, bool isTablet) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      centerTitle: true,
-      backgroundColor: Colors.white,
-      foregroundColor: Colors.black,
-      elevation: 0,
-      actions: [
-        Stack(
-          alignment: Alignment.topRight,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: isTablet ? 32.0 : 16.0,
+          vertical: isTablet ? 20.0 : 16.0,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            IconButton(
-              icon: const Icon(Icons.message_outlined),
-              onPressed: () {
-                // التنقل إلى صفحة الرسائل
-              },
-            ),
-            const NotificationBadge(count: "5"),
+            _buildActionButtons(context, isTablet),
+            _buildTitle(isTablet),
           ],
         ),
-        Stack(
-          alignment: Alignment.topRight,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.notifications_outlined),
-              onPressed: () {
-                context.push("/NotificationsScreen");
-              },
-            ),
-            const NotificationBadge(count: "3"),
-          ],
+      ),
+    );
+  }
+
+  Widget _buildActionButtons(BuildContext context, bool isTablet) {
+    return Row(
+      children: [
+        _buildActionButton(
+          icon: Icons.message_outlined,
+          badge: "5",
+          onTap: () {
+            // Navigate to messages
+          },
+          isTablet: isTablet,
+        ),
+        SizedBox(width: isTablet ? 16.0 : 12.0),
+        _buildActionButton(
+          icon: Icons.notifications_outlined,
+          badge: "3",
+          onTap: () => context.push("/NotificationsScreen"),
+          isTablet: isTablet,
         ),
       ],
     );
   }
-  
-  // بناء محتوى الشاشة
-  Widget _buildBody() {
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String badge,
+    required VoidCallback onTap,
+    required bool isTablet,
+  }) {
+    return Stack(
+      clipBehavior: Clip.none,
+
+      children: [
+        Container(
+          width: isTablet ? 48.0 : 44.0,
+          height: isTablet ? 48.0 : 44.0,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8F9FA),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: onTap,
+              child: Icon(
+                icon,
+                size: isTablet ? 24.0 : 20.0,
+                color: const Color(0xFF6B7280),
+              ),
+            ),
+          ),
+        ),
+        if (badge.isNotEmpty)
+          Positioned(
+            top: -2,
+            right: -2,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+              constraints: const BoxConstraints(
+                minWidth: 18,
+                minHeight: 18,
+              ),
+              child: Text(
+                badge,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: isTablet ? 12.0 : 10.0,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildTitle(bool isTablet) {
+    return Text(
+      "الرئيسية",
+      style: TextStyle(
+        fontSize: isTablet ? 24.0 : 20.0,
+        fontWeight: FontWeight.bold,
+        color: const Color(0xFF1F2937),
+      ),
+    );
+  }
+
+  Widget _buildMainContent(BuildContext context, bool isTablet, bool isDesktop) {
     return Column(
       children: [
-        // مفتاح تبديل حالة المطعم
-        RestaurantAvailabilitySwitch(
-          isAvailable: _isAvailableForOrders,
-          onChanged: (value) {
-            setState(() {
-              _isAvailableForOrders = value;
-            });
-          },
-        ),
-        
-        // شريط التبويب
-        _buildTabBar(),
-        
-        // محتوى التبويب
+        _buildAvailabilitySection(isTablet),
+        _buildTabBar(isTablet),
         Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              // قائمة الطلبات قيد الانتظار
-              _buildOrdersList(
-                _orders.where((order) => order.status == "قيد الانتظار").toList()
-              ),
-              
-              // قائمة الطلبات قيد التنفيذ
-              _buildOrdersList(
-                _orders.where((order) => order.status == "قيد التنفيذ").toList()
-              ),
-              
-              // قائمة الطلبات المنتهية
-              _buildOrdersList(
-                _orders.where((order) => order.status == "منتهية").toList()
-              ),
-            ],
-          ),
+          child: _isLoading
+              ? _buildLoadingIndicator()
+              : _buildTabBarView(context, isTablet, isDesktop),
         ),
       ],
     );
   }
-  
-  // بناء شريط التبويب
-  Widget _buildTabBar() {
+
+  Widget _buildAvailabilitySection(bool isTablet) {
+    return RestaurantAvailabilitySwitch(
+      isAvailable: _isAvailableForOrders,
+      onChanged: (value) {
+        setState(() {
+          _isAvailableForOrders = value;
+        });
+      },
+    );
+  }
+
+  Widget _buildTabBar(bool isTablet) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 0),
-      decoration: const BoxDecoration(
+      margin: EdgeInsets.symmetric(
+        horizontal: isTablet ? 24.0 : 16.0,
+        vertical: isTablet ? 16.0 : 6.0,
+      ),
+      decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(
-          bottom: BorderSide(
-            color: Colors.grey,
-            width: 0.5,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-        ),
+        ],
       ),
       child: TabBar(
         controller: _tabController,
-        indicator: const BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: Colors.orange,
-              width: 3.0,
-            ),
-          ),
+        indicator: BoxDecoration(
+          color: Colors.orange,
+          borderRadius: BorderRadius.circular(12),
         ),
         indicatorSize: TabBarIndicatorSize.tab,
-        labelColor: Colors.orange,
-        unselectedLabelColor: Colors.grey,
-        labelStyle: const TextStyle(fontWeight: FontWeight.bold),
-        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal),
+        indicatorPadding: const EdgeInsets.all(4),
+        labelColor: Colors.white,
+        unselectedLabelColor: const Color(0xFF6B7280),
+        labelStyle: TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: isTablet ? 16.0 : 14.0,
+        ),
+        unselectedLabelStyle: TextStyle(
+          fontWeight: FontWeight.w500,
+          fontSize: isTablet ? 16.0 : 14.0,
+        ),
         tabs: [
-          Tab(
+          _buildTab("قيد الانتظار", 0, isTablet),
+          _buildTab("قيد التنفيذ", 1, isTablet),
+          _buildTab("منتهية", 2, isTablet),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTab(String text, int index, bool isTablet) {
+    final isSelected = _tabController.index == index;
+    return Tab(
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: isTablet ? 20.0 : 16.0,
+          vertical: isTablet ? 12.0 : 10.0,
+        ),
+        child: Text(text),
+      ),
+    );
+  }
+
+  Widget _buildLoadingIndicator() {
+    return const Center(
+      child: CircularProgressIndicator(
+        valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+      ),
+    );
+  }
+
+  Widget _buildTabBarView(BuildContext context, bool isTablet, bool isDesktop) {
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildOrdersList(
+            _orders.where((order) => order.status == "قيد الانتظار").toList(),
+            isTablet,
+            isDesktop,
+          ),
+          _buildOrdersList(
+            _orders.where((order) => order.status == "قيد التنفيذ").toList(),
+            isTablet,
+            isDesktop,
+          ),
+          _buildOrdersList(
+            _orders.where((order) => order.status == "منتهية").toList(),
+            isTablet,
+            isDesktop,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrdersList(List<OrderModel> orders, bool isTablet, bool isDesktop) {
+    if (orders.isEmpty) {
+      return _buildEmptyState(isTablet);
+    }
+
+    final crossAxisCount = isDesktop ? 2 : 1;
+    final padding = isTablet ? 24.0 : 16.0;
+
+    if (crossAxisCount == 1) {
+      return ListView.builder(
+        padding: EdgeInsets.all(padding),
+        itemCount: orders.length,
+        physics: const BouncingScrollPhysics(),
+        itemBuilder: (context, index) {
+          return _buildOrderItem(orders[index], index, isTablet);
+        },
+      );
+    } else {
+      return GridView.builder(
+        padding: EdgeInsets.all(padding),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
+          crossAxisSpacing: 16.0,
+          mainAxisSpacing: 16.0,
+          childAspectRatio: 1.2,
+        ),
+        itemCount: orders.length,
+        physics: const BouncingScrollPhysics(),
+        itemBuilder: (context, index) {
+          return _buildOrderItem(orders[index], index, isTablet);
+        },
+      );
+    }
+  }
+
+  Widget _buildOrderItem(OrderModel order, int index, bool isTablet) {
+    return TweenAnimationBuilder<double>(
+      duration: Duration(milliseconds: 300 + (index * 100)),
+      tween: Tween(begin: 0.0, end: 1.0),
+      builder: (context, value, child) {
+        return Transform.translate(
+          offset: Offset(0, 20 * (1 - value)),
+          child: Opacity(
+            opacity: value,
             child: Container(
-              decoration: BoxDecoration(
-                color: _tabController.index == 0 ? Colors.orange.withOpacity(0.1) : Colors.transparent,
-                borderRadius: BorderRadius.circular(4),
+              margin: EdgeInsets.only(bottom: isTablet ? 16.0 : 12.0),
+              child: OrderCard(
+                order: order,
+                onViewDetails: _showOrderDetails,
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: const Text("قيد الانتظار"),
             ),
           ),
-          Tab(
-            child: Container(
-              decoration: BoxDecoration(
-                color: _tabController.index == 1 ? Colors.orange.withOpacity(0.1) : Colors.transparent,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: const Text("قيد التنفيذ"),
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyState(bool isTablet) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.inbox_outlined,
+            size: isTablet ? 80.0 : 64.0,
+            color: const Color(0xFFD1D5DB),
+          ),
+          SizedBox(height: isTablet ? 24.0 : 16.0),
+          Text(
+            "لا توجد طلبات",
+            style: TextStyle(
+              fontSize: isTablet ? 20.0 : 18.0,
+              color: const Color(0xFF6B7280),
+              fontWeight: FontWeight.w600,
             ),
           ),
-          Tab(
-            child: Container(
-              decoration: BoxDecoration(
-                color: _tabController.index == 2 ? Colors.orange.withOpacity(0.1) : Colors.transparent,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: const Text("منتهية"),
+          SizedBox(height: isTablet ? 12.0 : 8.0),
+          Text(
+            "ستظهر الطلبات الجديدة هنا",
+            style: TextStyle(
+              fontSize: isTablet ? 16.0 : 14.0,
+              color: const Color(0xFF9CA3AF),
             ),
           ),
         ],
       ),
     );
   }
-  
-  // بناء شريط التنقل السفلي
-  Widget _buildBottomNavigationBar() {
-    return BottomNavigationBar(
-      currentIndex: 0,
-      selectedItemColor: Colors.orange,
-      unselectedItemColor: Colors.grey,
-      showUnselectedLabels: true,
-      items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.home),
-          label: "الرئيسية",
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.calendar_today),
-          label: "القائمة",
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.bar_chart),
-          label: "الإحصائيات",
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.menu),
-          label: "المزيد",
-        ),
-      ],
-    );
-  }
-  
-  // بناء قائمة الطلبات
-  Widget _buildOrdersList(List<OrderModel> orders) {
-    if (orders.isEmpty) {
-      return const Center(
-        child: Text(
-          "لا توجد طلبات",
-          style: TextStyle(fontSize: 16),
-        ),
-      );
+
+  Widget _buildBottomNavigationBar(BuildContext context, bool isTablet) {
+    int currentIndex = 0; // القائمة
+
+    void onItemTapped(int index) {
+      switch (index) {
+        case 0:
+          context.go('/restaurant-home');
+          break;
+        case 1:
+          context.go('/Menu');
+          break;
+        case 2:
+          context.go('/RestaurantAnalysisScreen');
+          break;
+        case 3:
+          context.go('/SettingsProvider');
+          break;
+      }
     }
-    
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: orders.length,
-      itemBuilder: (context, index) {
-        final order = orders[index];
-        return OrderCard(
-          order: order,
-          onViewDetails: _showOrderDetails,
-        );
-      },
+
+    final List<Map<String, String>> navIcons = [
+      {"svg": "assets/icons/home_icon_provider.svg", "label": "الرئيسية"},
+      {"svg": "assets/icons/Nav_Menu_provider.svg", "label": "القائمة"},
+      {"svg": "assets/icons/Nav_Analysis_provider.svg", "label": "الإحصائيات"},
+      {"svg": "assets/icons/Settings.svg", "label": "الإعدادات"},
+    ];
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 12,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              vertical: isTablet ? 16 : 10,
+              horizontal: isTablet ? 20 : 8,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: List.generate(navIcons.length, (idx) {
+                final item = navIcons[idx];
+                final selected = idx == currentIndex;
+                Color mainColor =
+                selected ? Colors.orange : const Color(0xFF6B7280);
+
+                return InkWell(
+                  onTap: () => onItemTapped(idx),
+                  borderRadius: BorderRadius.circular(16),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isTablet ? 20 : 16,
+                      vertical: isTablet ? 12 : 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? Colors.orange.withOpacity(0.1)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SvgPicture.asset(
+                          item["svg"]!,
+                          height: isTablet ? 28 : 24,
+                          width: isTablet ? 28 : 24,
+                          colorFilter:
+                          ColorFilter.mode(mainColor, BlendMode.srcIn),
+                        ),
+                        SizedBox(height: isTablet ? 8 : 6),
+                        Text(
+                          item["label"]!,
+                          style: TextStyle(
+                            fontSize: isTablet ? 14 : 12,
+                            fontWeight: selected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: mainColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ),
+      ),
     );
   }
-  
-  // عرض تفاصيل الطلب
   void _showOrderDetails(OrderModel order) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => OrderDetailsScreen(order: order),
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            OrderDetailsScreen(order: order),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return SlideTransition(
+            position: animation.drive(
+              Tween(begin: const Offset(1.0, 0.0), end: Offset.zero)
+                  .chain(CurveTween(curve: Curves.easeInOut)),
+            ),
+            child: child,
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 300),
       ),
     );
   }

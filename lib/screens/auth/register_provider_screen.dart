@@ -37,12 +37,12 @@ class RegisterProviderScreen extends StatelessWidget {
 
               const SizedBox(height: 40),
               SizedBox(
-                height: 120,
+                height: 130,
                 child: Row(
                   children: [
                     _buildOptionBox(
                       context,
-                      icon: Icons.directions_car,
+                      image: AssetImage('assets/images/taxi.png'),
                       label: 'تأجير السيارات',
                       color: Colors.blue,
                       onTap: () => _navigateToDeliveryRegistration(context),
@@ -50,16 +50,16 @@ class RegisterProviderScreen extends StatelessWidget {
                     const SizedBox(width: 10),
                     _buildOptionBox(
                       context,
-                      icon: Icons.kitchen,
-                      label: 'المطعم',
+                      image: AssetImage('assets/images/restaurant.png'),
+                      label: 'المطاعم',
                       color: Colors.orange,
                       onTap: () => _navigateToCookingRegistration(context),
                     ),
                     const SizedBox(width: 10),
                     _buildOptionBox(
                       context,
-                      icon: Icons.home,
-                      label: 'عقارات',
+                      image: AssetImage('assets/images/building.png'),
+                      label: 'بحث عقارات',
                       color: Colors.green,
                       onTap: () => _navigateToSubscriptionRegistration(context),
                     ),
@@ -75,28 +75,32 @@ class RegisterProviderScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildOptionBox(
-      BuildContext context, {
-        required IconData icon,
-        required String label,
-        required Color color,
-        required VoidCallback onTap,
-      }) {
+  Widget _buildOptionBox(BuildContext context, {
+    required ImageProvider image, // <-- الصورة بدل الأيقونة
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
     return Expanded(
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
+
           padding: const EdgeInsets.symmetric(vertical: 20),
           decoration: BoxDecoration(
-            border: Border.all(color: color),
+            border: Border.all(color: color,width: 2),
             borderRadius: BorderRadius.circular(12),
             color: Colors.white,
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 40, color: color),
+              Image(
+                image: image,
+                width: 45,
+                height: 45,
+              ),
               const SizedBox(height: 10),
               Text(
                 label,
@@ -109,4 +113,5 @@ class RegisterProviderScreen extends StatelessWidget {
       ),
     );
   }
+
 }
