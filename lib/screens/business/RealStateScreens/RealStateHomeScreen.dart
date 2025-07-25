@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart' as intl;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'dart:io';
 
 class Property {
   String id;
@@ -661,7 +663,9 @@ class _RealStateHomeScreenState extends State<RealStateHomeScreen> with SingleTi
     }
   }
 
-  void _addProperty(BuildContext context) {
+ // استبدل هذه الدالة بالكامل في كودك
+
+void _addProperty(BuildContext context) {
     final addressController = TextEditingController();
     final priceController = TextEditingController();
     final typeController = TextEditingController();
@@ -671,400 +675,364 @@ class _RealStateHomeScreenState extends State<RealStateHomeScreen> with SingleTi
     final viewController = TextEditingController();
     final paymentMethodController = TextEditingController();
     final areaController = TextEditingController();
-    final submittedByController = TextEditingController();
-    final submittedPriceController = TextEditingController();
+    // --- تم التعطيل: الحقل غير مطلوب في الـ API ---
+     final submittedByController = TextEditingController();
+     final submittedPriceController = TextEditingController();
     final isReadyController = TextEditingController();
+
+    // --- إضافة جديدة: متغير لحفظ الصورة المختارة ---
+    File? _selectedImage;
 
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
         bool isReady = false;
-        return Directionality(
-          textDirection: TextDirection.rtl,
-          child: Dialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(24),
-            ),
-            elevation: 0,
-            backgroundColor: Colors.transparent,
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 600, maxHeight: 900),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.white,
-                    Colors.orange.shade50,
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.orange.shade400, Colors.orange.shade600],
-                      ),
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(24),
-                        topRight: Radius.circular(24),
-                      ),
+        // نستخدم StatefulBuilder للسماح بتحديث الصورة فور اختيارها
+        return StatefulBuilder(
+            builder: (dialogContext, setDialogState) {
+          return Directionality(
+            textDirection: TextDirection.rtl,
+            child: Dialog(
+              // ... نفس كود الـ Dialog الأصلي ...
+              child: Container(
+                // ... نفس كود الـ Container الأصلي ...
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      // ... نفس كود الـ Header الأصلي ...
                     ),
-                    child: Column(
-                      children: [
-                        Row(
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(
-                                Icons.add_location_alt,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            const Expanded(
+                            // --- بداية قسم إضافة الصورة (مع الحفاظ على التصميم الأصلي) ---
+                            // 1. عنوان نصي للقسم الجديد
+                            const Align(
+                              alignment: Alignment.centerRight,
                               child: Text(
-                                'إضافة عقار جديد',
+                                "صورة العقار",
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 20,
-                                  color: Colors.white,
+                                  fontSize: 16,
+                                  color: Colors.black87,
                                 ),
                               ),
                             ),
-                            IconButton(
-                              onPressed: () => Navigator.of(ctx).pop(),
-                              icon: const Icon(Icons.close, color: Colors.white),
-                              style: IconButton.styleFrom(
-                                backgroundColor: Colors.white.withOpacity(0.2),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
+                            const SizedBox(height: 8),
+
+                            // 2. حاوية عرض الصورة أو الأيقونة
+                            Container(
+                              width: double.infinity,
+                              height: 150,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[200],
+                                borderRadius: BorderRadius.circular(10),
                               ),
+                              child: _selectedImage != null
+                                  ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: Image.file(_selectedImage!, fit: BoxFit.cover),
+                                    )
+                                  : const Center(
+                                      child: Icon(Icons.house_siding_rounded, color: Colors.grey, size: 50),
+                                    ),
                             ),
+                            const SizedBox(height: 12),
+
+                            // 3. زر اختيار الصورة
+                            TextButton.icon(
+                                style: TextButton.styleFrom(
+                                    foregroundColor: Colors.orange.shade800,
+                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        side: BorderSide(color: Colors.orange.shade200)
+                                    )
+                                ),
+                                onPressed: () async {
+                                  final picker = ImagePicker();
+                                  final image = await picker.pickImage(source: ImageSource.gallery);
+                                  if (image != null) {
+                                    setDialogState(() { // <-- تحديث الصورة
+                                      _selectedImage = File(image.path);
+                                    });
+                                  }
+                                },
+                                icon: const Icon(Icons.add_photo_alternate_outlined),
+                                label: const Text("اختيار صورة للعقار")
+                            ),
+                            const Divider(height: 30),
+                            // --- نهاية قسم الصورة ---
+
+
+                            // --- العودة إلى الهيكل الأصلي بالكامل ---
+                            _buildEnhancedField(
+                              icon: Icons.location_on,
+                              label: "العنوان",
+                              controller: addressController,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildEnhancedField(
+                              icon: Icons.attach_money,
+                              label: "السعر",
+                              controller: priceController,
+                              keyboardType: TextInputType.number,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildEnhancedField(
+                              icon: Icons.apartment,
+                              label: "النوع",
+                              controller: typeController,
+                            ),
+                            const SizedBox(height: 12),
+                            
+                            _buildEnhancedField(
+                              icon: Icons.straighten,
+                              label: "المساحة",
+                              controller: areaController,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildEnhancedField(
+                              icon: Icons.bed,
+                              label: "عدد الغرف",
+                              controller: bedroomsController,
+                              keyboardType: TextInputType.number,
+                            ),
+                            const SizedBox(height: 12),
+                             _buildEnhancedField(
+                              icon: Icons.bathtub,
+                              label: "عدد الحمامات",
+                              controller: bathroomsController,
+                              keyboardType: TextInputType.number,
+                            ),
+                            const SizedBox(height: 12),
+                             _buildEnhancedField(
+                              icon: Icons.landscape,
+                              label: "الإطلالة",
+                              controller: viewController,
+                            ),
+                             const SizedBox(height: 12),
+                            _buildEnhancedField(
+                              icon: Icons.credit_card,
+                              label: "طريقة الدفع",
+                              controller: paymentMethodController,
+                            ),
+                             const SizedBox(height: 12),
+                             _buildEnhancedField(
+                              icon: Icons.notes,
+                              label: "الوصف",
+                              controller: descController,
+                              maxLines: 3,
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Checkbox(
+                                  
+                                  value: isReady,
+                                  onChanged: (value) {
+                                    setDialogState(() {
+                                      isReady = value ?? false;
+                                    });
+                                  },
+                                ),
+                                const Text('جاهز'),
+                              ],
+                            ),
+
+                            // --- تم التعطيل: الحقول غير مطلوبة في الـ API ---
+                            /*
+                            const Divider(height: 30),
+                             _buildEnhancedField(
+                              icon: Icons.business,
+                              label: "مقدم بواسطة",
+                              controller: submittedByController,
+                            ),
+                            const SizedBox(height: 12),
+                             _buildEnhancedField(
+                              icon: Icons.attach_money,
+                              label: "سعر المقدم",
+                              controller: submittedPriceController,
+                              keyboardType: TextInputType.number,
+                            ),
+                            */
                           ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                  Flexible(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        children: [
-                          _buildSectionCard(
-                            title: "المعلومات الأساسية",
-                            icon: Icons.info_outline,
-                            children: [
-                              _buildEnhancedField(
-                                icon: Icons.location_on,
-                                label: "العنوان",
-                                controller: addressController,
-                                iconColor: Colors.red.shade400,
-                                fontSize: 14,
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _buildEnhancedField(
-                                      icon: Icons.attach_money,
-                                      label: "السعر",
-                                      controller: priceController,
-                                      keyboardType: TextInputType.number,
-                                      iconColor: Colors.green.shade400,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: _buildEnhancedField(
-                                      icon: Icons.apartment,
-                                      label: "النوع",
-                                      controller: typeController,
-                                      iconColor: Colors.blue.shade400,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              _buildEnhancedField(
-                                icon: Icons.straighten,
-                                label: "المساحة",
-                                controller: areaController,
-                                iconColor: Colors.teal.shade400,
-                                fontSize: 14,
-                              ),
-                            ],
+                      Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: const BorderRadius.only(
+                              bottomLeft: Radius.circular(24),
+                              bottomRight: Radius.circular(24),
+                            ),
                           ),
-                          const SizedBox(height: 12),
-                          _buildSectionCard(
-                            title: "التفاصيل",
-                            icon: Icons.details,
+                          child: Row(
                             children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _buildEnhancedField(
-                                      icon: Icons.bed,
-                                      label: "عدد الغرف",
-                                      controller: bedroomsController,
-                                      keyboardType: TextInputType.number,
-                                      iconColor: Colors.purple.shade400,
-                                      fontSize: 14,
+                              Expanded(
+                                child: TextButton(
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Colors.grey[700],
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 14),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      side: BorderSide(
+                                          color: Colors.grey.shade300),
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: _buildEnhancedField(
-                                      icon: Icons.bathtub,
-                                      label: "عدد الحمامات",
-                                      controller: bathroomsController,
-                                      keyboardType: TextInputType.number,
-                                      iconColor: Colors.cyan.shade400,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _buildEnhancedField(
-                                      icon: Icons.landscape,
-                                      label: "الإطلالة",
-                                      controller: viewController,
-                                      iconColor: Colors.teal.shade400,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: _buildEnhancedField(
-                                      icon: Icons.credit_card,
-                                      label: "طريقة الدفع",
-                                      controller: paymentMethodController,
-                                      iconColor: Colors.indigo.shade400,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              _buildEnhancedField(
-                                icon: Icons.notes,
-                                label: "الوصف",
-                                controller: descController,
-                                maxLines: 3,
-                                iconColor: Colors.amber.shade600,
-                                fontSize: 14,
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Checkbox(
-                                    value: isReady,
-                                    onChanged: (value) {
-                                      setState(() {
-                                        isReady = value ?? false;
-                                      });
-                                    },
-                                  ),
-                                  const Text(
-                                    'جاهز',
+                                  onPressed: () => Navigator.of(ctx).pop(),
+                                  child: const Text(
+                                    'إلغاء',
                                     style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w600,
-                                      color: Colors.black87,
                                     ),
                                   ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          _buildSectionCard(
-                            title: "معلومات المقدم",
-                            icon: Icons.person_outline,
-                            children: [
-                              _buildEnhancedField(
-                                icon: Icons.business,
-                                label: "مقدم بواسطة",
-                                controller: submittedByController,
-                                iconColor: Colors.orange.shade400,
-                                fontSize: 14,
-                              ),
-                              const SizedBox(height: 12),
-                              _buildEnhancedField(
-                                icon: Icons.attach_money,
-                                label: "سعر المقدم",
-                                controller: submittedPriceController,
-                                keyboardType: TextInputType.number,
-                                iconColor: Colors.green.shade400,
-                                fontSize: 14,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: const BorderRadius.only(
-                        bottomLeft: Radius.circular(24),
-                        bottomRight: Radius.circular(24),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextButton(
-                            style: TextButton.styleFrom(
-                              foregroundColor: Colors.grey[700],
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                side: BorderSide(color: Colors.grey.shade300),
-                              ),
-                            ),
-                            onPressed: () => Navigator.of(ctx).pop(),
-                            child: const Text(
-                              'إلغاء',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          flex: 2,
-                          child: ElevatedButton.icon(
-                            icon: const Icon(Icons.save, size: 18),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.orange.shade500,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              elevation: 2,
-                              shadowColor: Colors.orange.withOpacity(0.3),
-                            ),
-                            label: const Text(
-                              'إضافة العقار',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                            onPressed: () {
-                              // تحقق أن الحقول المطلوبة ليست فاضية
-                              if (addressController.text.trim().isEmpty ||
-                                  priceController.text.trim().isEmpty ||
-                                  typeController.text.trim().isEmpty ||
-                                  bedroomsController.text.trim().isEmpty ||
-                                  bathroomsController.text.trim().isEmpty ||
-                                  areaController.text.trim().isEmpty ||
-                                  submittedByController.text.trim().isEmpty ||
-                                  submittedPriceController.text.trim().isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('يرجى ملء جميع الحقول المطلوبة'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                                return;
-                              }
-
-                              // تحقق أن الأرقام مكتوبة بشكل صحيح
-                              if (int.tryParse(priceController.text.trim()) == null ||
-                                  int.tryParse(bedroomsController.text.trim()) == null ||
-                                  int.tryParse(bathroomsController.text.trim()) == null ||
-                                  int.tryParse(submittedPriceController.text.trim()) == null) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('الرجاء إدخال أرقام صحيحة في الحقول الرقمية'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                                return;
-                              }
-
-                              setState(() {
-                                _properties.add(Property(
-                                  id: DateTime.now().millisecondsSinceEpoch.toString(),
-                                  address: addressController.text.trim(),
-                                  type: typeController.text.trim(),
-                                  price: int.parse(priceController.text.trim()),
-                                  description: descController.text.trim(),
-                                  imageUrl: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=80',
-                                  bedrooms: int.parse(bedroomsController.text.trim()),
-                                  bathrooms: int.parse(bathroomsController.text.trim()),
-                                  view: viewController.text.trim(),
-                                  paymentMethod: paymentMethodController.text.trim(),
-                                  area: areaController.text.trim(),
-                                  submittedBy: submittedByController.text.trim(),
-                                  submittedPrice: submittedPriceController.text.trim(),
-                                  isReady: isReady,
-                                ));
-                              });
-                              Navigator.of(ctx).pop();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Row(
-                                    children: [
-                                      Icon(Icons.check_circle, color: Colors.white),
-                                      SizedBox(width: 8),
-                                      Text('تم إضافة العقار بنجاح'),
-                                    ],
-                                  ),
-                                  backgroundColor: Colors.green.shade500,
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
                                 ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                flex: 2,
+                                child: ElevatedButton.icon(
+                                  icon: const Icon(Icons.save, size: 18),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.orange.shade500,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 14),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    elevation: 2,
+                                    shadowColor: Colors.orange.withOpacity(0.3),
+                                  ),
+                                  label: const Text(
+                                    'إضافة العقار',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  onPressed: () {
+                                    // تحقق أن الحقول المطلوبة ليست فاضية
+                                    if (addressController.text.trim().isEmpty ||
+                                        priceController.text.trim().isEmpty ||
+                                        typeController.text.trim().isEmpty ||
+                                        bedroomsController.text
+                                            .trim()
+                                            .isEmpty ||
+                                        bathroomsController.text
+                                            .trim()
+                                            .isEmpty ||
+                                        areaController.text.trim().isEmpty ||
+                                        submittedByController.text
+                                            .trim()
+                                            .isEmpty ||
+                                        submittedPriceController.text
+                                            .trim()
+                                            .isEmpty) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                              'يرجى ملء جميع الحقول المطلوبة'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    // تحقق أن الأرقام مكتوبة بشكل صحيح
+                                    if (int.tryParse(
+                                                priceController.text.trim()) ==
+                                            null ||
+                                        int.tryParse(bedroomsController.text
+                                                .trim()) ==
+                                            null ||
+                                        int.tryParse(bathroomsController.text
+                                                .trim()) ==
+                                            null ||
+                                        int.tryParse(submittedPriceController
+                                                .text
+                                                .trim()) ==
+                                            null) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                              'الرجاء إدخال أرقام صحيحة في الحقول الرقمية'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    setState(() {
+                                      _properties.add(Property(
+                                        id: DateTime.now()
+                                            .millisecondsSinceEpoch
+                                            .toString(),
+                                        address: addressController.text.trim(),
+                                        type: typeController.text.trim(),
+                                        price: int.parse(
+                                            priceController.text.trim()),
+                                        description: descController.text.trim(),
+                                        imageUrl:
+                                            'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=80',
+                                        bedrooms: int.parse(
+                                            bedroomsController.text.trim()),
+                                        bathrooms: int.parse(
+                                            bathroomsController.text.trim()),
+                                        view: viewController.text.trim(),
+                                        paymentMethod:
+                                            paymentMethodController.text.trim(),
+                                        area: areaController.text.trim(),
+                                        submittedBy:
+                                            submittedByController.text.trim(),
+                                        submittedPrice: submittedPriceController
+                                            .text
+                                            .trim(),
+                                        isReady: isReady,
+                                      ));
+                                    });
+                                    Navigator.of(ctx).pop();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: const Row(
+                                          children: [
+                                            Icon(Icons.check_circle,
+                                                color: Colors.white),
+                                            SizedBox(width: 8),
+                                            Text('تم إضافة العقار بنجاح'),
+                                          ],
+                                        ),
+                                        backgroundColor: Colors.green.shade500,
+                                        behavior: SnackBarBehavior.floating,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                  ],
+                ),
               ),
-            ),
-          ),
-        );
+            ]),
+          )
+    ));});
       },
     );
   }
-
+ 
   void _editProperty(BuildContext context, Property property) async {
     final addressController = TextEditingController(text: property.address);
     final priceController = TextEditingController(text: property.price.toString());

@@ -1,7 +1,16 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 import 'package:saba2v2/components/UI/image_picker_row.dart';
 import 'package:saba2v2/components/UI/section_title.dart';
+import 'package:saba2v2/providers/auth_provider.dart'; // تأكد من وجود هذا الـ Provider
+
 
 class SubscriptionRegistrationSingleScreen extends StatefulWidget {
   const SubscriptionRegistrationSingleScreen({super.key});
@@ -14,51 +23,201 @@ class SubscriptionRegistrationSingleScreen extends StatefulWidget {
 class _SubscriptionRegistrationSingleScreenState
     extends State<SubscriptionRegistrationSingleScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _brokerNameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
+  bool _isLoading = false;
+  bool _acceptTerms = false;
+
+  // Controllers for text fields
+  final TextEditingController _agentNameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
+
+  // State for local image paths and uploaded URLs
+  String? _profileImagePath;
+  String? _agentIdFrontPath;
+  String? _agentIdBackPath;
+  String? _taxCardFrontPath;
+  String? _taxCardBackPath;
+
+  String? _profileImageUrl;
+  String? _agentIdFrontImageUrl;
+  String? _agentIdBackImageUrl;
+  String? _taxCardFrontImageUrl;
+  String? _taxCardBackImageUrl;
 
   String? _selectedCity;
-  bool _acceptTerms = false;
-  bool _isPasswordVisible = false;
-  bool _isConfirmPasswordVisible = false;
-
-  // قائمة المدن للاختيار
   final List<String> _cities = [
-    'القاهرة',
-    'الجيزة',
-    'الإسكندرية',
-    'الدقهلية',
-    'البحر الأحمر',
-    'البحيرة',
-    'الفيوم',
-    'الغربية',
-    'الإسماعيلية',
-    'المنوفية',
-    'المنيا',
-    'القليوبية',
-    'الوادي الجديد',
-    'السويس',
-    'أسوان',
-    'أسيوط',
-    'بني سويف',
-    'بورسعيد',
-    'دمياط',
-    'الشرقية',
-    'جنوب سيناء',
-    'كفر الشيخ',
-    'مطروح',
-    'الأقصر',
-    'قنا',
-    'شمال سيناء',
-    'سوهاج'
+    'القاهرة', 'الجيزة', 'الإسكندرية', 'الدقهلية', 'البحر الأحمر',
+    'البحيرة', 'الفيوم', 'الغربية', 'الإسماعيلية', 'المنوفية', 'المنيا',
+    'القليوبية', 'الوادي الجديد', 'السويس', 'أسوان', 'أسيوط', 'بني سويف',
+    'بورسعيد', 'دمياط', 'الشرقية', 'جنوب سيناء', 'كفر الشيخ', 'مطروح',
+    'الأقصر', 'قنا', 'شمال سيناء', 'سوهاج'
   ];
+
+  // Base URL for the Laravel API
+  static const String _baseUrl = 'http://192.168.1.8:8000'; // استبدل هذا بالـ URL الفعلي
+
+  Future<void> _pickFile(String fieldName) async {
+    if (_isLoading) return;
+
+    PermissionStatus status = await Permission.photos.request();
+    if (!status.isGranted && Platform.isAndroid) {
+      status = await Permission.storage.request();
+    }
+
+    if (!status.isGranted) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('الرجاء منح صلاحية الوصول للصور')),
+        );
+      }
+      return;
+    }
+
+    final result = await FilePicker.platform.pickFiles(type: FileType.image);
+    if (result == null || result.files.isEmpty) return;
+
+    final path = result.files.single.path;
+    if (path != null) {
+      setState(() {
+        switch (fieldName) {
+          case 'profileImage': _profileImagePath = path; break;
+          case 'agentIdFront': _agentIdFrontPath = path; break;
+          case 'agentIdBack': _agentIdBackPath = path; break;
+          case 'taxCardFront': _taxCardFrontPath = path; break;
+          case 'taxCardBack': _taxCardBackPath = path; break;
+        }
+      });
+
+      final url = await _uploadFile(path, fieldName);
+      if (url != null) {
+        setState(() {
+          switch (fieldName) {
+            case 'profileImage': _profileImageUrl = url; break;
+            case 'agentIdFront': _agentIdFrontImageUrl = url; break;
+            case 'agentIdBack': _agentIdBackImageUrl = url; break;
+            case 'taxCardFront': _taxCardFrontImageUrl = url; break;
+            case 'taxCardBack': _taxCardBackImageUrl = url; break;
+          }
+        });
+      }
+    }
+  }
+
+  Future<String?> _uploadFile(String filePath, String fieldName) async {
+    setState(() => _isLoading = true);
+    try {
+      var request = http.MultipartRequest('POST', Uri.parse('$_baseUrl/api/upload'));
+      request.headers['Content-Type'] = 'multipart/form-data';
+      request.headers['Accept'] = 'application/json';
+      request.files.add(await http.MultipartFile.fromPath('files[]', filePath));
+
+      var response = await request.send().timeout(const Duration(seconds: 30));
+      var responseStatus = response.statusCode;
+
+      if (responseStatus != 201 && responseStatus != 200) {
+        var responseBody = await response.stream.bytesToString();
+        debugPrint('Error Body: $responseBody');
+        throw Exception('فشل الطلب: رمز الحالة $responseStatus');
+      }
+
+      var responseData = await response.stream.bytesToString();
+      var jsonResponse = jsonDecode(responseData);
+
+      if (jsonResponse['status'] == true && jsonResponse['files'] != null && jsonResponse['files'].isNotEmpty) {
+        return jsonResponse['files'][0] as String;
+      } else {
+        throw Exception(jsonResponse['message'] ?? 'فشل رفع الصورة');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل رفع الصورة: $e')));
+      }
+      return null;
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _removeFile(String fieldName) {
+    setState(() {
+      switch (fieldName) {
+        case 'profileImage': _profileImagePath = null; _profileImageUrl = null; break;
+        case 'agentIdFront': _agentIdFrontPath = null; _agentIdFrontImageUrl = null; break;
+        case 'agentIdBack': _agentIdBackPath = null; _agentIdBackImageUrl = null; break;
+        case 'taxCardFront': _taxCardFrontPath = null; _taxCardFrontImageUrl = null; break;
+        case 'taxCardBack': _taxCardBackPath = null; _taxCardBackImageUrl = null; break;
+      }
+    });
+  }
+
+  Future<void> _submitForm() async {
+    if (_isLoading) return;
+    if (!_formKey.currentState!.validate()) return;
+
+    if (!_acceptTerms) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('يجب الموافقة على الشروط والأحكام')),
+        );
+        return;
+    }
+
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('كلمتا السر غير متطابقتين')));
+      return;
+    }
+    
+    // تأكد من رفع الصور المطلوبة (الهوية على الأقل)
+    if (_profileImageUrl == null || _agentIdFrontImageUrl == null || _agentIdBackImageUrl == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('الرجاء رفع صورة الملف الشخصي وصور الهوية')));
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      // استدعاء الدالة الجديدة من الـ Provider
+      final result = await authProvider.registerIndividualAgent(
+        name: _agentNameController.text.trim(),
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        phone: _phoneController.text.trim(),
+        governorate: _selectedCity!,
+        profileImage: _profileImageUrl!,
+        agentIdFrontImage: _agentIdFrontImageUrl!,
+        agentIdBackImage: _agentIdBackImageUrl!,
+        // الصور الاختيارية
+        taxCardFrontImage: _taxCardFrontImageUrl,
+        taxCardBackImage: _taxCardBackImageUrl,
+      );
+
+      if (result['status']) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تم إنشاء الحساب بنجاح'), backgroundColor: Colors.green),
+          );
+          context.go('/RealStateHomeScreen');
+        }
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(result['message'] ?? 'حدث خطأ أثناء التسجيل')),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('حدث خطأ: $e')));
+      }
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
 
   @override
   void dispose() {
-    _brokerNameController.dispose();
+    _agentNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
     _passwordController.dispose();
@@ -66,82 +225,31 @@ class _SubscriptionRegistrationSingleScreenState
     super.dispose();
   }
 
-  void _register() {
-    // if (_formKey.currentState!.validate() && _acceptTerms) {
-    //   if (_passwordController.text != _confirmPasswordController.text) {
-    //     ScaffoldMessenger.of(context).showSnackBar(
-    //       const SnackBar(content: Text('كلمتا المرور غير متطابقتين')),
-    //     );
-    //     return;
-    //   }
-    //
-    //   ScaffoldMessenger.of(context).showSnackBar(
-    //     const SnackBar(content: Text('تم تسجيل الوسيط العقاري بنجاح')),
-    //   );
-    // } else if (!_acceptTerms) {
-    //   ScaffoldMessenger.of(context).showSnackBar(
-    //     const SnackBar(content: Text('يجب الموافقة على الشروط والأحكام')),
-    //   );
-    // }
-    context.go('/RealStateHomeScreen');
-  }
-
   Widget _buildFormField({
-    required String label,
+    required String hintText,
     required TextEditingController controller,
-    TextInputType? keyboardType,
     bool obscureText = false,
-    bool showVisibilityToggle = false,
+    TextInputType? keyboardType,
   }) {
     return TextFormField(
       controller: controller,
-      keyboardType: keyboardType,
       obscureText: obscureText,
+      keyboardType: keyboardType,
       textAlign: TextAlign.right,
-      textDirection: TextDirection.rtl,
       decoration: InputDecoration(
-        hintText: label,
-        hintStyle: TextStyle(
-          color: Colors.grey[600],
-        ),
+        hintText: hintText,
         filled: true,
         fillColor: Colors.grey[100],
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12.0),
           borderSide: BorderSide.none,
         ),
-        contentPadding: const EdgeInsets.symmetric(
-          vertical: 18.0,
-          horizontal: 20.0,
-        ),
-        suffixIcon: showVisibilityToggle
-            ? IconButton(
-                icon: Icon(
-                  obscureText ? Icons.visibility_off : Icons.visibility,
-                  color: Colors.grey[600],
-                ),
-                onPressed: () {
-                  setState(() {
-                    if (label.contains('المرور')) {
-                      _isPasswordVisible = !_isPasswordVisible;
-                    } else {
-                      _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
-                    }
-                  });
-                },
-              )
-            : null,
+        contentPadding: const EdgeInsets.symmetric(vertical: 15.0, horizontal: 20.0),
       ),
       validator: (value) {
-        if (value == null || value.isEmpty) {
-          return 'هذا الحقل مطلوب';
-        }
-        if (label == 'البريد الإلكتروني' &&
-            !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+        if (value == null || value.isEmpty) return 'هذا الحقل مطلوب';
+        if (hintText == 'البريد الإلكتروني' && !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
           return 'بريد إلكتروني غير صحيح';
-        }
-        if (label.contains('المرور') && value.length < 6) {
-          return 'يجب أن تكون 6 أحرف على الأقل';
         }
         return null;
       },
@@ -157,208 +265,134 @@ class _SubscriptionRegistrationSingleScreenState
         foregroundColor: Colors.black,
         elevation: 1,
       ),
-      body: SafeArea(
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: double.infinity,
-                  child: const SectionTitle(title: 'معلومات الوسيط'),
-                ),
-                // الحقول النصية
-                _buildFormField(
-                  label: 'اسم الوسيط العقاري',
-                  controller: _brokerNameController,
-                ),
-                const SizedBox(height: 16),
-                _buildFormField(
-                  label: 'البريد الإلكتروني',
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                ),
-                const SizedBox(height: 16),
-                _buildFormField(
-                  label: 'رقم الهاتف',
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                ),
-                const SizedBox(height: 16),
-               Directionality(
-                textDirection: TextDirection.rtl,
-                 child: DropdownButtonFormField<String>(
-                    value: _selectedCity,
-                    alignment: AlignmentDirectional.centerEnd,
-                    decoration: InputDecoration(
-                      labelText: 'المدينة',
-                      filled: true,
-                      fillColor: Colors.grey[100],
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12.0),
-                        borderSide: BorderSide.none,
+      body: Stack(
+        children: [
+          Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SectionTitle(title: 'معلومات الوسيط'),
+                  const SizedBox(height: 16),
+                  _buildFormField(hintText: 'اسم الوسيط العقاري', controller: _agentNameController),
+                  const SizedBox(height: 16),
+                  _buildFormField(hintText: 'البريد الإلكتروني', controller: _emailController, keyboardType: TextInputType.emailAddress),
+                  const SizedBox(height: 16),
+                  _buildFormField(hintText: 'رقم الهاتف', controller: _phoneController, keyboardType: TextInputType.phone),
+                  const SizedBox(height: 16),
+                  Directionality(
+                    textDirection: TextDirection.rtl,
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedCity,
+                      decoration: InputDecoration(
+                        labelText: 'المحافظة',
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0), borderSide: BorderSide.none),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        vertical: 15.0,
-                        horizontal: 20.0,
-                      ),
+                      items: _cities.map((String city) => DropdownMenuItem<String>(value: city, child: Text(city, textAlign: TextAlign.right))).toList(),
+                      onChanged: _isLoading ? null : (v) => setState(() => _selectedCity = v),
+                      validator: (v) => v == null ? 'الرجاء اختيار المحافظة' : null,
                     ),
-                    icon: const Padding(
-                      padding: EdgeInsets.only(left: 12.0),
-                      child: Icon(Icons.keyboard_arrow_down),
-                    ),
-                    iconSize: 28,
-                    iconEnabledColor: Colors.grey[600],
-                    items: _cities.map((String city) {
-                      return DropdownMenuItem<String>(
-                        value: city,
-                        alignment: AlignmentDirectional.centerEnd,
-                        child: Text(
-                          city,
-                          textAlign: TextAlign.right,
-                          style: const TextStyle(fontSize: 16),
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (String? newValue) {
-                      setState(() => _selectedCity = newValue);
-                    },
-                    validator: (value) => value == null ? 'الرجاء اختيار المدينة' : null,
                   ),
-               ),
-                const SizedBox(height: 16),
-
-                _buildFormField(
-                  label: 'كلمة المرور',
-                  controller: _passwordController,
-                  obscureText: !_isPasswordVisible,
-                  showVisibilityToggle: true,
-                ),
-                const SizedBox(height: 16),
-                _buildFormField(
-                  label: 'تأكيد كلمة المرور',
-                  controller: _confirmPasswordController,
-                  obscureText: !_isConfirmPasswordVisible,
-                  showVisibilityToggle: true,
-                ),
-
-                // هوية الوسيط
-                Container(
-                  width: double.infinity,
-                  child: const SectionTitle(title: 'هوية الوسيط العقاري'),
-                ),
-                const SizedBox(height: 15),
-                ImagePickerRow(
-                  label: 'الهوية الأمامية',
-                  icon: Icons.credit_card,
-                  fieldIdentifier: 'idFront',
-                  onTap: () => _pickFile('idFront'),
-                ),
-                const SizedBox(height: 12),
-                ImagePickerRow(
-                  label: 'الهوية الخلفية',
-                  icon: Icons.credit_card,
-                  fieldIdentifier: 'idBack',
-                  onTap: () => _pickFile('idBack'),
-                ),
-
-                // البطاقة الضريبية
-                const SizedBox(height: 24),
-                Container(
-                  width: double.infinity,
-                  child:  const Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                     Text("إذا وجدت"),
-                      SizedBox(width: 8),
-                      Text(
-                        'بطاقة ضريبية',
-                        textAlign: TextAlign.right,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: 16),
+                  _buildFormField(hintText: 'كلمة السر', controller: _passwordController, obscureText: true),
+                  const SizedBox(height: 16),
+                  _buildFormField(hintText: 'تأكيد كلمة السر', controller: _confirmPasswordController, obscureText: true),
+                  
+                  const SizedBox(height: 24),
+                  const SectionTitle(title: 'صورة الملف الشخصي'),
+                  const SizedBox(height: 16),
+                  ImagePickerRow(
+                    label: 'اختيار صورة',
+                    icon: Icons.person_outline,
+                    fieldIdentifier: 'profileImage',
+                    onTap: () => _pickFile('profileImage'),
+                    imagePath: _profileImagePath,
+                    onRemove: () => _removeFile('profileImage'),
                   ),
-                ),
-                const SizedBox(height: 15),
-                ImagePickerRow(
-                  label: 'الوجه الأمامي للبطاقة',
-                  icon: Icons.receipt_long,
-                  fieldIdentifier: 'taxFront',
-                  onTap: () => _pickFile('taxFront'),
-                ),
-                const SizedBox(height: 12),
-                ImagePickerRow(
-                  label: 'الوجه الخلفي للبطاقة',
-                  icon: Icons.receipt_long,
-                  fieldIdentifier: 'taxBack',
-                  onTap: () => _pickFile('taxBack'),
-                ),
 
-
-                // الشروط والأحكام
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => showTermsDialog(context),
-                      child: const Text('الشروط والأحكام'),
-                    ),
-                    Transform.scale(
-                      scale: 1.2,
-                      child: Checkbox(
-                        value: _acceptTerms,
-                        onChanged: (v) => setState(() => _acceptTerms = v ?? false),
-                        activeColor: Colors.orange,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                // زر التسجيل
-                const SizedBox(height: 32),
-                Padding(
-                  padding: EdgeInsets.only(
-                    bottom: MediaQuery.of(context).viewPadding.bottom + 16,
+                  const SectionTitle(title: 'هوية الوسيط العقاري'),
+                  const SizedBox(height: 16),
+                  ImagePickerRow(
+                    label: 'الهوية الأمامية',
+                    icon: Icons.credit_card,
+                    fieldIdentifier: 'agentIdFront',
+                    onTap: () => _pickFile('agentIdFront'),
+                    imagePath: _agentIdFrontPath,
+                    onRemove: () => _removeFile('agentIdFront'),
                   ),
-                  child: SizedBox(
+                  const SizedBox(height: 12),
+                  ImagePickerRow(
+                    label: 'الهوية الخلفية',
+                    icon: Icons.credit_card,
+                    fieldIdentifier: 'agentIdBack',
+                    onTap: () => _pickFile('agentIdBack'),
+                    imagePath: _agentIdBackPath,
+                    onRemove: () => _removeFile('agentIdBack'),
+                  ),
+
+                  const SectionTitle(title: 'بطاقة ضريبية (إن وجدت)'),
+                  const SizedBox(height: 16),
+                  ImagePickerRow(
+                    label: 'الوجه الأمامي للبطاقة',
+                    icon: Icons.receipt_long,
+                    fieldIdentifier: 'taxCardFront',
+                    onTap: () => _pickFile('taxCardFront'),
+                    imagePath: _taxCardFrontPath,
+                    onRemove: () => _removeFile('taxCardFront'),
+                  ),
+                  const SizedBox(height: 12),
+                  ImagePickerRow(
+                    label: 'الوجه الخلفي للبطاقة',
+                    icon: Icons.receipt_long,
+                    fieldIdentifier: 'taxCardBack',
+                    onTap: () => _pickFile('taxCardBack'),
+                    imagePath: _taxCardBackPath,
+                    onRemove: () => _removeFile('taxCardBack'),
+                  ),
+
+                  const SizedBox(height: 24),
+                   Directionality(
+                    textDirection: TextDirection.rtl,
+                    child: CheckboxListTile(
+                      title: TextButton(
+                          onPressed: () => showTermsDialog(context),
+                          child: const Text('أوافق على الشروط والأحكام'),
+                        ),
+                      value: _acceptTerms,
+                      onChanged: (v) => setState(() => _acceptTerms = v ?? false),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      activeColor: Colors.orange,
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+                  SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _register,
+                      onPressed: _isLoading ? null : _submitForm,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.orange,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 20),
-                        minimumSize: const Size(double.infinity, 56),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                        elevation: 2,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: const Text(
-                        'إنشاء الحساب',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
+                      child: const Text('إنشاء الحساب', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
                     ),
                   ),
-                ),  
-              ],
+                  const SizedBox(height: 20),
+                ],
+              ),
             ),
           ),
-        ),
+          if (_isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.5),
+              child: const Center(child: CircularProgressIndicator(color: Colors.orange)),
+            ),
+        ],
       ),
     );
   }
@@ -368,20 +402,9 @@ class _SubscriptionRegistrationSingleScreenState
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('الشروط والأحكام'),
-        content: const SingleChildScrollView(
-          child: Text('...نص الشروط والأحكام هنا'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('موافق'),
-          ),
-        ],
+        content: const SingleChildScrollView(child: Text('...نص الشروط والأحكام هنا...')),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('موافق'))],
       ),
     );
-  }
-
-  Future<void> _pickFile(String fieldName) async {
-    // TODO: Implement file picking logic
   }
 }

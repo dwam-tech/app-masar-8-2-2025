@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:saba2v2/providers/auth_provider.dart';
 
 class RealStateSettingsProvider extends StatefulWidget {
   const RealStateSettingsProvider({super.key});
@@ -162,7 +164,14 @@ class _RealStateSettingsProviderState extends State<RealStateSettingsProvider> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: () => context.go("/login"),
+                          onPressed: () 
+                          { // استدعاء دالة logout من الـ Provider
+    context.read<AuthProvider>().logout();
+
+    // ملاحظة: ليس هناك حاجة لعمل context.go('/login') هنا،
+    // لأن GoRouter سيقوم بذلك تلقائيًا عندما يستمع للتغيير.
+ },
+                          //=> context.go("/login"),
                           icon: const Icon(Icons.logout, color: Colors.white, size: 20),
                           label: const Text(
                             "تسجيل الخروج",
@@ -176,6 +185,9 @@ class _RealStateSettingsProviderState extends State<RealStateSettingsProvider> {
                             ),
                           ),
                         ),
+
+
+                        
                       ),
                     ],
                   ),

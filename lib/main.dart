@@ -1,6 +1,8 @@
+// مسار الملف: lib/main.dart
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/date_symbol_data_local.dart'; // <<<--- الخطوة 1: تم إضافة هذا السطر
 import 'package:saba2v2/router/app_router.dart';
 import 'package:saba2v2/providers/service_category_provider.dart';
 import 'package:saba2v2/providers/restaurant_provider.dart';
@@ -8,7 +10,11 @@ import 'package:saba2v2/providers/real_estate_provider.dart';
 import 'package:saba2v2/providers/auth_provider.dart';
 
 void main() async {
+  // التأكد من تهيئة Flutter bindings
   WidgetsFlutterBinding.ensureInitialized();
+
+  // <<<--- الخطوة 2: تم إضافة هذا السطر لتهيئة بيانات اللغة العربية ---
+  await initializeDateFormatting('ar', null);
 
   // تهيئة مدير الحالة
   final authProvider = AuthProvider();
@@ -49,7 +55,6 @@ void main() async {
         routerConfig: AppRouter.createRouter(authProvider),
         debugShowCheckedModeBanner: false,
         locale: const Locale('ar', 'EG'),
-        // هنا الإضافة لمنع تكبير/تصغير الخط من السيستم
         builder: (context, child) {
           return MediaQuery(
             data: MediaQuery.of(context).copyWith(textScaleFactor: 1.0),

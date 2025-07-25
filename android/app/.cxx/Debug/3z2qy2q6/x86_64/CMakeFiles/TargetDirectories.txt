@@ -1,0 +1,2 @@
+E:/Code/flutter/app-masar-v1/android/app/.cxx/Debug/3z2qy2q6/x86_64/CMakeFiles/edit_cache.dir
+E:/Code/flutter/app-masar-v1/android/app/.cxx/Debug/3z2qy2q6/x86_64/CMakeFiles/rebuild_cache.dir

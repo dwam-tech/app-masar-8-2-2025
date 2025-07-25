@@ -144,6 +144,7 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
         password: _passwordController.text,
         phone: _phoneController.text.trim(),
         governorate: _selectedCity!,
+        
       );
 
       if (result['status']) {
