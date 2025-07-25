@@ -69,7 +69,7 @@ class PropertyService {
     }
 
     final response = await http.get(
-      Uri.parse('$_baseUrl/api/my-properties'),
+      Uri.parse('$_baseUrl/api/properties'),
       headers: {
         'Accept': 'application/json',
         'Authorization': 'Bearer $token',
