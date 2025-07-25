@@ -28,6 +28,14 @@ class PropertyService {
       throw Exception('User is not authenticated');
     }
 
+    // نحاول الحصول على معرف مكتب/وكيل العقارات المسجل
+    final userData = await _authService.getUserData();
+    final realEstateId =
+        userData?['real_estate_id'] ?? userData?['id']; // احتياطي في حال اختلف الاسم
+    if (realEstateId == null) {
+      throw Exception('Real estate ID not found');
+    }
+
     final response = await http.post(
       Uri.parse('$_baseUrl/api/properties'),
       headers: {
@@ -36,6 +44,7 @@ class PropertyService {
         'Authorization': 'Bearer $token',
       },
       body: jsonEncode({
+        'real_estate_id': realEstateId,
         'address': address,
         'type': type,
         'price': price,
