@@ -5,6 +5,10 @@ import 'package:intl/intl.dart' as intl;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:io';
+import 'package:provider/provider.dart';
+import 'package:saba2v2/providers/auth_provider.dart';
+import 'package:saba2v2/services/property_service.dart';
+import 'package:saba2v2/models/property_model.dart' as api;
 
 class Property {
   String id;
@@ -18,8 +22,6 @@ class Property {
   String view;
   String paymentMethod;
   String area;
-  String submittedBy;
-  String submittedPrice;
   bool isReady;
 
   Property({
@@ -34,8 +36,6 @@ class Property {
     required this.view,
     required this.paymentMethod,
     required this.area,
-    required this.submittedBy,
-    required this.submittedPrice,
     this.isReady = false,
   });
 }
@@ -249,46 +249,6 @@ class PropertyCard extends StatelessWidget {
                     color: Colors.grey[200],
                   ),
                   const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: Colors.orange[100],
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.business,
-                          color: Colors.orange[700],
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'مقدم : ${intl.NumberFormat('#,###').format(int.parse(property.submittedPrice))} ج.م',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                              ),
-                            ),
-                            Text(
-                              property.submittedBy,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
                   const SizedBox(height: 20),
                   Row(
                     children: [
@@ -545,56 +505,9 @@ class _RealStateHomeScreenState extends State<RealStateHomeScreen> with SingleTi
   TimeOfDay _selectedTime = TimeOfDay.now();
   final TextEditingController _notesController = TextEditingController();
 
-  final List<Property> _properties = [
-    Property(
-      id: '1',
-      address: 'التجمع الخامس - القاهرة',
-      type: 'فيلا',
-      price: 4300000,
-      description: 'فيلا حديثة بتشطيبات سوبر لوكس وحمام سباحة وحديقة خاصة.',
-      imageUrl: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=80',
-      bedrooms: 5,
-      bathrooms: 4,
-      view: 'حديقة',
-      paymentMethod: 'كاش',
-      area: '300م²',
-      submittedBy: 'شركة العقارات المصرية',
-      submittedPrice: '430000',
-      isReady: true,
-    ),
-    Property(
-      id: '2',
-      address: 'مدينة نصر - القاهرة',
-      type: 'شقة',
-      price: 1750000,
-      description: 'شقة واسعة بالدور الخامس مع مصعد وتشطيب فاخر.',
-      imageUrl: 'https://images.unsplash.com/photo-1523217582562-09d0def993a6?auto=format&fit=crop&w=600&q=80',
-      bedrooms: 3,
-      bathrooms: 2,
-      view: 'شارع رئيسي',
-      paymentMethod: 'تقسيط',
-      area: '150م²',
-      submittedBy: 'وكالة الماسة',
-      submittedPrice: '175000',
-      isReady: false,
-    ),
-    Property(
-      id: '3',
-      address: 'الشيخ زايد - 6 أكتوبر',
-      type: 'مكتب إداري',
-      price: 950000,
-      description: 'مكتب إداري مفروش بالكامل في مول حديث.',
-      imageUrl: 'https://images.unsplash.com/photo-1460518451285-97b6aa326961?auto=format&fit=crop&w=600&q=80',
-      bedrooms: 0,
-      bathrooms: 1,
-      view: 'نيل',
-      paymentMethod: 'رهن عقاري',
-      area: '80م²',
-      submittedBy: 'شركة الريادة',
-      submittedPrice: '95000',
-      isReady: true,
-    ),
-  ];
+  final List<Property> _properties = [];
+  final PropertyService _propertyService = PropertyService();
+  bool _loadingProperties = true;
 
   bool _isTablet(BuildContext context) => MediaQuery.of(context).size.width >= 768;
 
@@ -603,6 +516,7 @@ class _RealStateHomeScreenState extends State<RealStateHomeScreen> with SingleTi
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(_handleTabSelection);
+    _fetchProperties();
   }
 
   @override
@@ -615,6 +529,39 @@ class _RealStateHomeScreenState extends State<RealStateHomeScreen> with SingleTi
 
   void _handleTabSelection() {
     setState(() {});
+  }
+
+  Future<void> _fetchProperties() async {
+    try {
+      final list = await _propertyService.getMyProperties();
+      setState(() {
+        _properties.clear();
+        _properties.addAll(list.map((api.Property p) => Property(
+              id: p.id.toString(),
+              address: p.address,
+              type: p.type,
+              price: p.price,
+              description: p.description,
+              imageUrl: p.imageUrl,
+              bedrooms: p.bedrooms,
+              bathrooms: p.bathrooms,
+              view: p.view,
+              paymentMethod: p.paymentMethod,
+              area: p.area,
+              isReady: p.isReady,
+            )));
+        _loadingProperties = false;
+      });
+    } catch (e) {
+      setState(() {
+        _loadingProperties = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -663,6 +610,12 @@ class _RealStateHomeScreenState extends State<RealStateHomeScreen> with SingleTi
     }
   }
 
+  // هذه دالة رفع الصورة بشكل مبسط. يمكن استبدالها باستدعاء API حقيقي.
+  Future<String> _uploadImage(File image) async {
+    // TODO: ربط هذه الدالة بواجهة رفع الصور في السيرفر
+    return image.path;
+  }
+
  // استبدل هذه الدالة بالكامل في كودك
 
 void _addProperty(BuildContext context) {
@@ -675,10 +628,6 @@ void _addProperty(BuildContext context) {
     final viewController = TextEditingController();
     final paymentMethodController = TextEditingController();
     final areaController = TextEditingController();
-    // --- تم التعطيل: الحقل غير مطلوب في الـ API ---
-     final submittedByController = TextEditingController();
-     final submittedPriceController = TextEditingController();
-    final isReadyController = TextEditingController();
 
     // --- إضافة جديدة: متغير لحفظ الصورة المختارة ---
     File? _selectedImage;
@@ -919,107 +868,98 @@ void _addProperty(BuildContext context) {
                                       fontSize: 14,
                                     ),
                                   ),
-                                  onPressed: () {
+                                  onPressed: () async {
                                     // تحقق أن الحقول المطلوبة ليست فاضية
                                     if (addressController.text.trim().isEmpty ||
                                         priceController.text.trim().isEmpty ||
                                         typeController.text.trim().isEmpty ||
-                                        bedroomsController.text
-                                            .trim()
-                                            .isEmpty ||
-                                        bathroomsController.text
-                                            .trim()
-                                            .isEmpty ||
-                                        areaController.text.trim().isEmpty ||
-                                        submittedByController.text
-                                            .trim()
-                                            .isEmpty ||
-                                        submittedPriceController.text
-                                            .trim()
-                                            .isEmpty) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
+                                        bedroomsController.text.trim().isEmpty ||
+                                        bathroomsController.text.trim().isEmpty ||
+                                        areaController.text.trim().isEmpty) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(
-                                          content: Text(
-                                              'يرجى ملء جميع الحقول المطلوبة'),
+                                          content: const Text('يرجى ملء جميع الحقول المطلوبة'),
                                           backgroundColor: Colors.red,
                                         ),
                                       );
                                       return;
                                     }
 
-                                    // تحقق أن الأرقام مكتوبة بشكل صحيح
-                                    if (int.tryParse(
-                                                priceController.text.trim()) ==
-                                            null ||
-                                        int.tryParse(bedroomsController.text
-                                                .trim()) ==
-                                            null ||
-                                        int.tryParse(bathroomsController.text
-                                                .trim()) ==
-                                            null ||
-                                        int.tryParse(submittedPriceController
-                                                .text
-                                                .trim()) ==
-                                            null) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
+                                    // تحقق من القيم الرقمية
+                                    if (int.tryParse(priceController.text.trim()) == null ||
+                                        int.tryParse(bedroomsController.text.trim()) == null ||
+                                        int.tryParse(bathroomsController.text.trim()) == null) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(
-                                          content: Text(
-                                              'الرجاء إدخال أرقام صحيحة في الحقول الرقمية'),
+                                          content: const Text('الرجاء إدخال أرقام صحيحة في الحقول الرقمية'),
                                           backgroundColor: Colors.red,
                                         ),
                                       );
                                       return;
                                     }
 
-                                    setState(() {
-                                      _properties.add(Property(
-                                        id: DateTime.now()
-                                            .millisecondsSinceEpoch
-                                            .toString(),
+                                    String imageUrl = 'https://via.placeholder.com/150';
+                                    if (_selectedImage != null) {
+                                      imageUrl = await _uploadImage(_selectedImage!);
+                                    }
+
+                                    try {
+                                      final apiProperty = await PropertyService().addProperty(
                                         address: addressController.text.trim(),
                                         type: typeController.text.trim(),
-                                        price: int.parse(
-                                            priceController.text.trim()),
+                                        price: int.parse(priceController.text.trim()),
                                         description: descController.text.trim(),
-                                        imageUrl:
-                                            'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=80',
-                                        bedrooms: int.parse(
-                                            bedroomsController.text.trim()),
-                                        bathrooms: int.parse(
-                                            bathroomsController.text.trim()),
+                                        imageUrl: imageUrl,
+                                        bedrooms: int.parse(bedroomsController.text.trim()),
+                                        bathrooms: int.parse(bathroomsController.text.trim()),
                                         view: viewController.text.trim(),
-                                        paymentMethod:
-                                            paymentMethodController.text.trim(),
+                                        paymentMethod: paymentMethodController.text.trim(),
                                         area: areaController.text.trim(),
-                                        submittedBy:
-                                            submittedByController.text.trim(),
-                                        submittedPrice: submittedPriceController
-                                            .text
-                                            .trim(),
                                         isReady: isReady,
-                                      ));
-                                    });
-                                    Navigator.of(ctx).pop();
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: const Row(
-                                          children: [
-                                            Icon(Icons.check_circle,
-                                                color: Colors.white),
-                                            SizedBox(width: 8),
-                                            Text('تم إضافة العقار بنجاح'),
-                                          ],
+                                      );
+
+                                      setState(() {
+                                        _properties.add(Property(
+                                          id: apiProperty.id.toString(),
+                                          address: apiProperty.address,
+                                          type: apiProperty.type,
+                                          price: apiProperty.price,
+                                          description: apiProperty.description,
+                                          imageUrl: apiProperty.imageUrl,
+                                          bedrooms: apiProperty.bedrooms,
+                                          bathrooms: apiProperty.bathrooms,
+                                          view: apiProperty.view,
+                                          paymentMethod: apiProperty.paymentMethod,
+                                          area: apiProperty.area,
+                                          isReady: apiProperty.isReady,
+                                        ));
+                                      });
+
+                                      Navigator.of(ctx).pop();
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: const Row(
+                                            children: [
+                                              Icon(Icons.check_circle, color: Colors.white),
+                                              SizedBox(width: 8),
+                                              Text('تم إضافة العقار بنجاح'),
+                                            ],
+                                          ),
+                                          backgroundColor: Colors.green.shade500,
+                                          behavior: SnackBarBehavior.floating,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
                                         ),
-                                        backgroundColor: Colors.green.shade500,
-                                        behavior: SnackBarBehavior.floating,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
+                                      );
+                                    } catch (e) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(e.toString()),
+                                          backgroundColor: Colors.red,
                                         ),
-                                      ),
-                                    );
+                                      );
+                                    }
                                   },
                                 ),
                               ),
@@ -1043,8 +983,6 @@ void _addProperty(BuildContext context) {
     final viewController = TextEditingController(text: property.view);
     final paymentMethodController = TextEditingController(text: property.paymentMethod);
     final areaController = TextEditingController(text: property.area);
-    final submittedByController = TextEditingController(text: property.submittedBy);
-    final submittedPriceController = TextEditingController(text: property.submittedPrice);
     bool isReady = property.isReady;
 
     await showDialog(
@@ -1323,28 +1261,6 @@ void _addProperty(BuildContext context) {
                             ],
                           ),
                           const SizedBox(height: 12),
-                          _buildSectionCard(
-                            title: "معلومات المقدم",
-                            icon: Icons.person_outline,
-                            children: [
-                              _buildEnhancedField(
-                                icon: Icons.business,
-                                label: "مقدم بواسطة",
-                                controller: submittedByController,
-                                iconColor: Colors.orange.shade400,
-                                fontSize: 14,
-                              ),
-                              const SizedBox(height: 12),
-                              _buildEnhancedField(
-                                icon: Icons.attach_money,
-                                label: "سعر المقدم",
-                                controller: submittedPriceController,
-                                keyboardType: TextInputType.number,
-                                iconColor: Colors.green.shade400,
-                                fontSize: 14,
-                              ),
-                            ],
-                          ),
                         ],
                       ),
                     ),
@@ -1413,8 +1329,6 @@ void _addProperty(BuildContext context) {
                                 property.view = viewController.text.trim();
                                 property.paymentMethod = paymentMethodController.text.trim();
                                 property.area = areaController.text.trim();
-                                property.submittedBy = submittedByController.text.trim();
-                                property.submittedPrice = submittedPriceController.text.trim();
                                 property.isReady = isReady;
                               });
                               Navigator.of(ctx).pop();
@@ -1474,6 +1388,8 @@ void _addProperty(BuildContext context) {
     final isTablet = _isTablet(context);
     final screenHeight = MediaQuery.of(context).size.height;
     final paddingBottom = MediaQuery.of(context).padding.bottom;
+    final userType = context.watch<AuthProvider>().userData?['user_type'];
+    final canAddProperty = userType == 'real_estate_office' || userType == 'real_estate_individual';
     return Scaffold(
       backgroundColor: Colors.grey[100],
       body: SafeArea(
@@ -1645,9 +1561,11 @@ void _addProperty(BuildContext context) {
                   ),
                   Stack(
                     children: [
-                      _properties.isEmpty
-                          ? const Center(child: Text('لا توجد عقارات متاحة', style: TextStyle(fontSize: 16)))
-                          : ListView.builder(
+                      _loadingProperties
+                          ? const Center(child: CircularProgressIndicator())
+                          : _properties.isEmpty
+                              ? const Center(child: Text('لا توجد عقارات متاحة', style: TextStyle(fontSize: 16)))
+                              : ListView.builder(
                         padding: EdgeInsets.only(
                           top: 0,
                           bottom: 80 + paddingBottom,
@@ -1666,35 +1584,36 @@ void _addProperty(BuildContext context) {
                           );
                         },
                       ),
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          color: Colors.grey[100],
-                          child: SafeArea(
-                            child: ElevatedButton(
-                              onPressed: () => _addProperty(context),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.orange,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                      if (canAddProperty)
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            color: Colors.grey[100],
+                            child: SafeArea(
+                              child: ElevatedButton(
+                                onPressed: () => _addProperty(context),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.orange,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
                                 ),
-                              ),
-                              child: const Text(
-                                'إضافة عقار',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
+                                child: const Text(
+                                  'إضافة عقار',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ],
