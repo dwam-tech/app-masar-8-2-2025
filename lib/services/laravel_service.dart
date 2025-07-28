@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 // Base URL for the Laravel API
-const String baseUrl = 'http://192.168.1.8:8000';
+const String baseUrl = 'http://192.168.1.7:8000';
 
 class LaravelService {
 
@@ -171,6 +171,7 @@ class LaravelService {
  
  Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('real_estate_id');
     final token = prefs.getString('token');
     try {
       await http.post(

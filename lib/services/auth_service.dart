@@ -6,7 +6,7 @@ import 'package:intl/intl.dart'; // إضافة مكتبة intl لتنسيق ال
 import 'package:saba2v2/services/laravel_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-const String baseUrl = 'http://192.168.1.8:8000';
+const String baseUrl = 'http://192.168.1.7:8000';
 
 class AuthService {
   final LaravelService _laravelService = LaravelService();
@@ -292,63 +292,105 @@ class AuthService {
 //   }
 
  Future<Map<String, dynamic>> login({
-    required String email, // تم تحديثه ليكون email بدلاً من identifier
-    required String password,
-  }) async {
-    try {
-      final Map<String, String> body = {
-        'email': email,
-        'password': password,
-      };
+  required String email,
+  required String password,
+}) async {
+  try {
+    final Map<String, String> body = { 'email': email, 'password': password };
 
-      final response = await http.post(
-        Uri.parse('$baseUrl/api/login'),
-        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-        body: jsonEncode(body),
-      );
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/login'),
+      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+      body: jsonEncode(body),
+    );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final responseData = jsonDecode(response.body);
-        
-        // التحقق من وجود التوكن وبيانات المستخدم قبل الحفظ
-        if (responseData['token'] != null && responseData['user'] != null) {
-          await _saveToken(responseData['token']);
-          await _saveUserData(responseData['user']);
-        }
-        
-        return {
-          'status': responseData['status'] ?? true,
-          'message': responseData['message'] ?? 'Login successful',
-          'user': responseData['user'],
-        };
-      } else {
-        // طباعة رسالة الخطأ التفصيلية من السيرفر
-        debugPrint('API Login Error: ${response.body}');
-        final responseData = jsonDecode(response.body);
-        throw Exception(responseData['message'] ?? 'Login failed');
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final responseData = jsonDecode(response.body);
+
+      // ==========================================================
+      // --- أضف جمل الطباعة هنا للتحقق ---
+      debugPrint("AuthService LOGIN: Login successful. API Response received.");
+      debugPrint("AuthService LOGIN: Full user data from API: ${jsonEncode(responseData['user'])}");
+      // ==========================================================
+
+      if (responseData['token'] != null && responseData['user'] != null) {
+        await _saveToken(responseData['token']);
+        await _saveUserData(responseData['user']); // هذه الدالة ستحاول حفظ real_estate_id
       }
-    } catch (e) {
-      debugPrint('A NETWORK or CONNECTION error occurred during login: $e');
-      throw Exception('Error during login: $e');
-    }
-  
 
-  // ... (باقي الدوال مثل _saveToken, _saveUserData, etc.)
+      return {
+        'status': responseData['status'] ?? true,
+        'message': responseData['message'] ?? 'Login successful',
+        'user': responseData['user'],
+      };
+    } else {
+      debugPrint('AuthService LOGIN: API Login Error: ${response.body}');
+      final responseData = jsonDecode(response.body);
+      throw Exception(responseData['message'] ?? 'Login failed');
+    }
+  } catch (e) {
+    debugPrint('AuthService LOGIN: A NETWORK or CONNECTION error occurred during login: $e');
+    throw Exception('Error during login: $e');
+  }
 }
- 
- 
- 
   Future<void> _saveToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('token', token);
   }
 
-  
-   Future<void> _saveUserData(Map<String, dynamic> userData) async {
+
+  Future<void> _saveUserData(Map<String, dynamic> userData) async {
     final prefs = await SharedPreferences.getInstance();
+
+    // 1. حفظ بيانات المستخدم الكاملة كنص JSON للرجوع إليها عند الحاجة
     await prefs.setString('user_data', jsonEncode(userData));
+
+    // 2. حفظ الـ ID الخاص بكيان مكتب التأجير الرئيسي (CarRental)
+    if (userData['car_rental']?['id'] != null) {
+      final carRentalId = userData['car_rental']['id'];
+      await prefs.setInt('car_rental_id', carRentalId);
+      debugPrint("AuthService: Saved car_rental_id -> $carRentalId");
+    }
+
+    // 3. التحقق من وجود تفاصيل المكتب وحفظ كل البيانات الهامة منها
+    final officeDetail = userData['car_rental']?['office_detail'];
+    if (officeDetail != null) {
+      // حفظ الـ ID الخاص بتفاصيل المكتب
+      if (officeDetail['id'] != null) {
+        final officeDetailId = officeDetail['id'];
+        await prefs.setInt('car_rental_office_detail_id', officeDetailId);
+        debugPrint("AuthService: Saved car_rental_office_detail_id -> $officeDetailId");
+      }
+
+      // **الإضافة الأهم: حفظ حالة المفاتيح بشكل صريح**
+      // هذا يضمن أن الشاشة الرئيسية ستجد هذه القيم عند التحميل
+      if (officeDetail['is_available_for_delivery'] != null) {
+        final isDelivery = (officeDetail['is_available_for_delivery'] == true || officeDetail['is_available_for_delivery'] == 1);
+        await prefs.setBool('is_delivery_enabled', isDelivery);
+        debugPrint("AuthService: Saved is_delivery_enabled -> $isDelivery");
+      }
+
+      if (officeDetail['is_available_for_rent'] != null) {
+        final isRent = (officeDetail['is_available_for_rent'] == true || officeDetail['is_available_for_rent'] == 1);
+        await prefs.setBool('is_rental_enabled', isRent);
+        debugPrint("AuthService: Saved is_rental_enabled -> $isRent");
+      }
+    }
+
+    // 4. حفظ بيانات العقارات (إذا وجدت)
+    if (userData['real_estate']?['id'] != null) {
+      final realEstateId = userData['real_estate']['id'];
+      await prefs.setInt('real_estate_id', realEstateId);
+      debugPrint("AuthService: Saved real_estate_id -> $realEstateId");
+    }
   }
- 
+
+
+  Future<int?> getRealEstateId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('real_estate_id');
+  }
+
 
   Future<void> logout() async {
     try {
