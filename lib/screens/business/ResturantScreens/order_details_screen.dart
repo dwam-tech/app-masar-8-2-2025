@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:saba2v2/models/order_model.dart';
+import 'package:saba2v2/services/order_service.dart';
+import 'package:saba2v2/providers/restaurant_order_provider.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
   final OrderModel order;
@@ -21,6 +24,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
   late Animation<double> _fadeAnimation;
 
   bool _isLoading = false;
+  final OrderService _orderService = OrderService();
+  late OrderModel _currentOrder; // لتتبع الطلب المحدث
 
   // Responsive breakpoints
   static const double _tabletBreakpoint = 768.0;
@@ -29,6 +34,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
   @override
   void initState() {
     super.initState();
+    _currentOrder = widget.order; // تهيئة الطلب الحالي
     _initializeAnimations();
   }
 
@@ -142,7 +148,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
                         ),
                       ),
                       Text(
-                        "#${widget.order.id}",
+                        "#${_currentOrder.orderNumber}",
                         style: TextStyle(
                           fontSize: isTablet ? 16.0 : 14.0,
                           fontWeight: FontWeight.w600,
@@ -158,8 +164,33 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
             SizedBox(width: isTablet ? 20.0 : 16.0),
             _buildStatusChip(isTablet),
             SizedBox(width: isTablet ? 20.0 : 16.0),
+            _buildRefreshButton(context, isTablet),
+            SizedBox(width: isTablet ? 12.0 : 8.0),
             _buildBackButton(context, isTablet),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRefreshButton(BuildContext context, bool isTablet) {
+    return Container(
+      width: isTablet ? 48.0 : 44.0,
+      height: isTablet ? 48.0 : 44.0,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F9FA),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: _isLoading ? null : () => _refreshOrderData(context),
+          child: Icon(
+            Icons.refresh,
+            size: isTablet ? 22.0 : 18.0,
+            color: _isLoading ? Colors.grey : const Color(0xFF6B7280),
+          ),
         ),
       ),
     );
@@ -189,26 +220,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
   }
 
   Widget _buildStatusChip(bool isTablet) {
-    Color statusColor;
-    Color backgroundColor;
-
-    switch (widget.order.status) {
-      case "قيد الانتظار":
-        statusColor = Colors.orange;
-        backgroundColor = Colors.orange.withOpacity(0.1);
-        break;
-      case "قيد التنفيذ":
-        statusColor = Colors.blue;
-        backgroundColor = Colors.blue.withOpacity(0.1);
-        break;
-      case "منتهية":
-        statusColor = Colors.green;
-        backgroundColor = Colors.green.withOpacity(0.1);
-        break;
-      default:
-        statusColor = Colors.grey;
-        backgroundColor = Colors.grey.withOpacity(0.1);
-    }
+    Color statusColor = _getStatusColor(_currentOrder.status);
+    Color backgroundColor = statusColor.withOpacity(0.1);
+    String statusText = _getStatusDisplayText(_currentOrder.status);
 
     return Container(
       padding: EdgeInsets.symmetric(
@@ -220,7 +234,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
-        widget.order.status,
+        statusText,
         style: TextStyle(
           fontSize: isTablet ? 14.0 : 12.0,
           fontWeight: FontWeight.w600,
@@ -325,7 +339,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      widget.order.customerName,
+                      _currentOrder.customerName,
                       style: TextStyle(
                         fontSize: isTablet ? 20.0 : 18.0,
                         fontWeight: FontWeight.bold,
@@ -335,7 +349,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
                     ),
                     SizedBox(height: isTablet ? 6.0 : 4.0),
                     Text(
-                      _formatOrderTime(widget.order.orderTime),
+                      _formatOrderTime(_currentOrder.orderTime),
                       style: TextStyle(
                         fontSize: isTablet ? 16.0 : 14.0,
                         color: const Color(0xFF6B7280),
@@ -362,20 +376,20 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
           SizedBox(height: isTablet ? 16.0 : 12.0),
           _buildInfoRow(
             "وقت الطلب",
-            _formatOrderTime(widget.order.orderTime),
+            _formatOrderTime(_currentOrder.orderTime),
             isTablet,
           ),
           SizedBox(height: isTablet ? 12.0 : 8.0),
           _buildInfoRow(
             "حالة الطلب",
-            widget.order.status,
+            _getStatusDisplayText(_currentOrder.status),
             isTablet,
-            valueColor: _getStatusColor(widget.order.status),
+            valueColor: _getStatusColor(_currentOrder.status),
           ),
           SizedBox(height: isTablet ? 12.0 : 8.0),
           _buildInfoRow(
             "عدد الأصناف",
-            "${widget.order.items.length} صنف",
+            "${_currentOrder.items.length} صنف",
             isTablet,
           ),
         ],
@@ -391,7 +405,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
         children: [
           _buildSectionTitle("تفاصيل الطلب", isTablet),
           SizedBox(height: isTablet ? 16.0 : 12.0),
-          ...widget.order.items.asMap().entries.map((entry) {
+          ..._currentOrder.items.asMap().entries.map((entry) {
             final index = entry.key;
             final item = entry.value;
             return TweenAnimationBuilder<double>(
@@ -402,7 +416,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
                   offset: Offset(-20 * (1 - value), 0), // تغيير الاتجاه للعربية
                   child: Opacity(
                     opacity: value,
-                    child: _buildOrderItem(item, isTablet, index == widget.order.items.length - 1),
+                    child: _buildOrderItem(item, isTablet, index == _currentOrder.items.length - 1),
                   ),
                 );
               },
@@ -479,7 +493,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
         children: [
           _buildSectionTitle("ملخص الطلب", isTablet),
           SizedBox(height: isTablet ? 16.0 : 12.0),
-          _buildSummaryRow("المجموع الفرعي", "${widget.order.totalAmount}", isTablet),
+          _buildSummaryRow("المجموع الفرعي", "${_currentOrder.totalAmount}", isTablet),
           SizedBox(height: isTablet ? 12.0 : 8.0),
           _buildSummaryRow("رسوم التوصيل", "20", isTablet),
           SizedBox(height: isTablet ? 12.0 : 8.0),
@@ -489,7 +503,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
           SizedBox(height: isTablet ? 16.0 : 12.0),
           _buildSummaryRow(
             "المجموع النهائي",
-            "${widget.order.totalAmount + 35}",
+            "${_currentOrder.totalAmount + 35}",
             isTablet,
             isTotal: true,
           ),
@@ -581,111 +595,100 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
   }
 
   Widget _buildActionButtons(BuildContext context, bool isTablet) {
-    if (widget.order.status == "منتهية") {
-      return const SizedBox.shrink(); // No buttons for completed orders
+    // Don't show buttons for completed, rejected, or pending orders
+    if (_currentOrder.status == "completed" || 
+        _currentOrder.status == "rejected_by_admin" || 
+        _currentOrder.status == "pending") {
+      if (_currentOrder.status == "completed") {
+        return Container(
+          padding: EdgeInsets.all(isTablet ? 20.0 : 16.0),
+          child: Text(
+            "تم إكمال الطلب بنجاح",
+            style: TextStyle(
+              fontSize: isTablet ? 18.0 : 16.0,
+              fontWeight: FontWeight.bold,
+              color: Colors.green,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        );
+      }
+      return const SizedBox.shrink();
     }
 
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
+      padding: EdgeInsets.all(isTablet ? 20.0 : 16.0),
+      child: Column(
+        children: [
+          if (_currentOrder.status == "accepted_by_admin") ...[
+            SizedBox(
+              width: double.infinity,
+              height: isTablet ? 56.0 : 48.0,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : () => _handleStartProcessing(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: _isLoading
+                    ? SizedBox(
+                        height: isTablet ? 24.0 : 20.0,
+                        width: isTablet ? 24.0 : 20.0,
+                        child: const CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Text(
+                        "بدء معالجة الطلب",
+                        style: TextStyle(
+                          fontSize: isTablet ? 16.0 : 14.0,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+              ),
+            ),
+          ] else if (_currentOrder.status == "processing") ...[
+            SizedBox(
+              width: double.infinity,
+              height: isTablet ? 56.0 : 48.0,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : () => _handleCompleteOrder(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: _isLoading
+                    ? SizedBox(
+                        height: isTablet ? 24.0 : 20.0,
+                        width: isTablet ? 24.0 : 20.0,
+                        child: const CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Text(
+                        "إكمال الطلب",
+                        style: TextStyle(
+                          fontSize: isTablet ? 16.0 : 14.0,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+              ),
+            ),
+          ],
         ],
       ),
-      child: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.all(isTablet ? 24.0 : 16.0),
-          child: widget.order.status == "قيد الانتظار"
-              ? _buildPendingButtons(context, isTablet)
-              : _buildInProgressButtons(context, isTablet),
-        ),
-      ),
     );
   }
 
-  Widget _buildPendingButtons(BuildContext context, bool isTablet) {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildActionButton(
-            text: "رفض الطلب",
-            color: Colors.red,
-            backgroundColor: Colors.red.withOpacity(0.1),
-            onPressed: () => _handleRejectOrder(context),
-            isTablet: isTablet,
-          ),
-        ),
-        SizedBox(width: isTablet ? 16.0 : 12.0),
-        Expanded(
-          child: _buildActionButton(
-            text: "قبول الطلب",
-            color: Colors.white,
-            backgroundColor: Colors.green,
-            onPressed: () => _handleAcceptOrder(context),
-            isTablet: isTablet,
-          ),
-        ),
-      ],
-    );
-  }
 
-  Widget _buildInProgressButtons(BuildContext context, bool isTablet) {
-    return SizedBox(
-      width: double.infinity,
-      child: _buildActionButton(
-        text: "تسليم الطلب",
-        color: Colors.white,
-        backgroundColor: Colors.orange,
-        onPressed: () => _handleDeliverOrder(context),
-        isTablet: isTablet,
-      ),
-    );
-  }
-
-  Widget _buildActionButton({
-    required String text,
-    required Color color,
-    required Color backgroundColor,
-    required VoidCallback onPressed,
-    required bool isTablet,
-  }) {
-    return Container(
-      height: isTablet ? 56.0 : 48.0,
-      child: ElevatedButton(
-        onPressed: _isLoading ? null : onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: backgroundColor,
-          foregroundColor: color,
-          elevation: 0,
-          shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        child: _isLoading
-            ? SizedBox(
-          width: isTablet ? 24.0 : 20.0,
-          height: isTablet ? 24.0 : 20.0,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(color),
-          ),
-        )
-            : Text(
-          text,
-          style: TextStyle(
-            fontSize: isTablet ? 18.0 : 16.0,
-            fontWeight: FontWeight.w600,
-            fontFamily: 'Cairo',
-          ),
-        ),
-      ),
-    );
-  }
 
   String _formatOrderTime(DateTime dateTime) {
     final now = DateTime.now();
@@ -702,150 +705,203 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
 
   Color _getStatusColor(String status) {
     switch (status) {
-      case "قيد الانتظار":
+      case "accepted_by_admin":
         return Colors.orange;
-      case "قيد التنفيذ":
+      case "processing":
         return Colors.blue;
-      case "منتهية":
+      case "completed":
         return Colors.green;
+      case "rejected_by_admin":
+        return Colors.red;
+      case "pending":
+        return Colors.grey;
       default:
         return Colors.grey;
     }
   }
 
-  Future<void> _handleAcceptOrder(BuildContext context) async {
-    setState(() => _isLoading = true);
-
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 1));
-
-    if (mounted) {
-      setState(() => _isLoading = false);
-      _showSuccessDialog(context, "تم قبول الطلب بنجاح");
+  String _getStatusDisplayText(String status) {
+    switch (status) {
+      case "accepted_by_admin":
+        return "معتمد من الإدارة";
+      case "processing":
+        return "قيد المعالجة";
+      case "completed":
+        return "مكتمل";
+      case "rejected_by_admin":
+        return "مرفوض من الإدارة";
+      case "pending":
+        return "معلق";
+      default:
+        return status;
     }
   }
 
-  Future<void> _handleRejectOrder(BuildContext context) async {
-    final confirmed = await _showConfirmationDialog(
-      context,
-      "تأكيد رفض الطلب",
-      "هل أنت متأكد من رفض هذا الطلب؟",
-    );
+  Future<void> _refreshOrderData(BuildContext context) async {
+    setState(() {
+      _isLoading = true;
+    });
 
-    if (confirmed == true) {
-      setState(() => _isLoading = true);
-
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 1));
+    try {
+      final refreshedOrder = await _orderService.getOrderById(_currentOrder.id);
+      setState(() {
+        _currentOrder = refreshedOrder;
+        _isLoading = false;
+      });
 
       if (mounted) {
-        setState(() => _isLoading = false);
-        _showSuccessDialog(context, "تم رفض الطلب");
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("تم تحديث بيانات الطلب بنجاح"),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("خطأ في تحديث بيانات الطلب: ${e.toString()}"),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
 
-  Future<void> _handleDeliverOrder(BuildContext context) async {
-    setState(() => _isLoading = true);
+  Future<void> _handleStartProcessing(BuildContext context) async {
+    setState(() {
+      _isLoading = true;
+    });
 
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      // تحديث بيانات الطلب أولاً للحصول على أحدث حالة
+      final refreshedOrder = await _orderService.getOrderById(_currentOrder.id);
+      setState(() {
+        _currentOrder = refreshedOrder;
+      });
 
-    if (mounted) {
-      setState(() => _isLoading = false);
-      _showSuccessDialog(context, "تم تسليم الطلب بنجاح");
+      // التحقق من حالة الطلب بعد التحديث
+      if (_currentOrder.status != "accepted_by_admin") {
+        setState(() {
+          _isLoading = false;
+        });
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("لا يمكن بدء معالجة الطلب. الحالة الحالية: ${_getStatusDisplayText(_currentOrder.status)}"),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      final updatedOrder = await _orderService.startProcessingOrder(_currentOrder.id);
+      setState(() {
+        _currentOrder = updatedOrder;
+        _isLoading = false;
+      });
+
+      // 🔄 تحديث قائمة الطلبات في Provider
+      if (mounted) {
+        final orderProvider = context.read<RestaurantOrderProvider>();
+        orderProvider.fetchOrders(silent: true);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("تم بدء معالجة الطلب بنجاح"),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("خطأ في بدء معالجة الطلب: ${e.toString()}"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
-  Future<bool?> _showConfirmationDialog(BuildContext context, String title, String message) {
-    return showDialog<bool>(
-      context: context,
-      builder: (context) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: Text(
-            title,
-            style: const TextStyle(fontFamily: 'Cairo'),
-          ),
-          content: Text(
-            message,
-            style: const TextStyle(fontFamily: 'Cairo'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text(
-                "إلغاء",
-                style: TextStyle(fontFamily: 'Cairo'),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              child: const Text(
-                "تأكيد",
-                style: TextStyle(color: Colors.white, fontFamily: 'Cairo'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Future<void> _handleCompleteOrder(BuildContext context) async {
+    setState(() {
+      _isLoading = true;
+    });
 
-  void _showSuccessDialog(BuildContext context, String message) {
-    showDialog(
-      context: context,
-      builder: (context) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          contentPadding: const EdgeInsets.symmetric(vertical: 24, horizontal: 8),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Icon(Icons.check_circle, color: Color(0xFFFC8700), size: 48),
-              const SizedBox(height: 12),
-              const Text(
-                "تم بنجاح",
-                style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold, fontSize: 20),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                message,
-                style: const TextStyle(fontFamily: 'Cairo', fontSize: 16),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: 120,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context); // Close dialog
-                    Navigator.pop(context); // Go back to previous screen
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFC8700),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text(
-                    "موافق",
-                    style: TextStyle(color: Colors.white, fontFamily: 'Cairo', fontSize: 16),
-                  ),
-                ),
-              ),
-            ],
+    try {
+      // تحديث بيانات الطلب أولاً للحصول على أحدث حالة
+      final refreshedOrder = await _orderService.getOrderById(_currentOrder.id);
+      setState(() {
+        _currentOrder = refreshedOrder;
+      });
+
+      // التحقق من حالة الطلب بعد التحديث
+      if (_currentOrder.status != "processing") {
+        setState(() {
+          _isLoading = false;
+        });
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("لا يمكن إكمال الطلب. الحالة الحالية: ${_getStatusDisplayText(_currentOrder.status)}"),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      final updatedOrder = await _orderService.completeOrder(_currentOrder.id);
+      setState(() {
+        _currentOrder = updatedOrder;
+        _isLoading = false;
+      });
+
+      // 🔄 تحديث قائمة الطلبات في Provider
+      if (mounted) {
+        final orderProvider = context.read<RestaurantOrderProvider>();
+        orderProvider.fetchOrders(silent: true);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("تم إكمال الطلب بنجاح"),
+            backgroundColor: Colors.green,
           ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("خطأ في إكمال الطلب: ${e.toString()}"),
+            backgroundColor: Colors.red,
           ),
-        ),
-      ),
-    );
+        );
+      }
+    }
   }
 
 }

@@ -1,13 +1,11 @@
-// مسار الملف المقترح: lib/models/MenuItem.dart
-
 class MenuItem {
-  final int id; // تعديل: الـ API يرسل ID رقمي (int) وليس نصي (String)
-  final int menuSectionId; // إضافة: حقل ضروري لربط الوجبة بالقسم
+  final int id;
+  final int menuSectionId;
   String name;
   String description;
   String imageUrl;
-  double price; // تعديل: تم تغيير الاسم من basePrice إلى price ليتطابق مع الـ API
-  bool isAvailable; // إضافة: حقل ضروري لمعرفة إذا كانت الوجبة متاحة
+  double price;
+  bool isAvailable;
 
   MenuItem({
     required this.id,
@@ -19,18 +17,20 @@ class MenuItem {
     required this.isAvailable,
   });
 
-  // إضافة: دالة لتحويل الـ JSON القادم من الـ API إلى كائن MenuItem
+  /// **النسخة النهائية المصححة لتطابق الـ JSON**
   factory MenuItem.fromJson(Map<String, dynamic> json) {
     return MenuItem(
-      id: json['id'],
-      menuSectionId: json['menu_section_id'],
-      name: json['name'] ?? '',
+      id: json['id'] ?? 0,
+      // **التصحيح: الخادم يرسل "section_id"**
+      menuSectionId: json['section_id'] ?? 0, 
+      // **التصحيح: الخادم يرسل "title"**
+      name: json['title'] ?? '', 
       description: json['description'] ?? '',
-      imageUrl: json['image_url'] ?? '', // تم تعديل اسم الحقل
-      price: double.tryParse(json['price'].toString()) ?? 0.0, // تحويل آمن
-      isAvailable: json['is_available'] == 1 || json['is_available'] == true, // تحويل آمن
+      // **التصحيح: الخادم يرسل "image"**
+      imageUrl: json['image'] ?? '', 
+      price: double.tryParse(json['price'].toString()) ?? 0.0,
+      // **التصحيح: الخادم لا يرسل هذا الحقل، لذا نعطيه قيمة افتراضية**
+      isAvailable: json['is_available'] ?? true, 
     );
   }
-
-  // ملاحظة: تم حذف List<MenuOption> لأنها غير موجودة في API إدارة المطاعم
 }

@@ -56,7 +56,7 @@ class _SubscriptionRegistrationSingleScreenState
   ];
 
   // Base URL for the Laravel API
-  static const String _baseUrl = 'http://192.168.1.8:8000'; // استبدل هذا بالـ URL الفعلي
+  static const String _baseUrl = 'http://192.168.1.7:8000'; // استبدل هذا بالـ URL الفعلي
 
   Future<void> _pickFile(String fieldName) async {
     if (_isLoading) return;

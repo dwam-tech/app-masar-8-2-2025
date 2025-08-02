@@ -3,16 +3,75 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:saba2v2/providers/auth_provider.dart';
+import 'package:saba2v2/services/auth_service.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+
+
+
 
 class RealStateSettingsProvider extends StatefulWidget {
   const RealStateSettingsProvider({super.key});
 
   @override
-  State<RealStateSettingsProvider> createState() => _RealStateSettingsProviderState();
+  State<RealStateSettingsProvider> createState() =>
+      _RealStateSettingsProviderState();
 }
 
 class _RealStateSettingsProviderState extends State<RealStateSettingsProvider> {
   bool isArabic = true; // متغير لتتبع اللغة الحالية
+
+  // --- متغيرات الحالة لجلب الإعدادات ---
+  final AuthService _authService = AuthService();
+  Map<String, dynamic> _appSettings = {};
+  bool _isLoadingSocials = true; // تتبع حالة تحميل روابط التواصل فقط
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings(); // استدعاء دالة جلب الإعدادات
+  }
+
+  /// دالة لجلب الإعدادات من الـ API وتحديث الحالة
+  Future<void> _loadSettings() async {
+    try {
+      final settings = await _authService.fetchSettings();
+      if (mounted) {
+        setState(() {
+          _appSettings = settings;
+          _isLoadingSocials = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+          _isLoadingSocials = false;
+        });
+      }
+    }
+  }
+
+  /// دالة لفتح الروابط أو الاتصال الهاتفي
+  Future<void> _launchURL(String value, {bool isPhone = false}) async {
+    Uri? uri;
+    if (isPhone) {
+      uri = Uri.parse('tel:$value');
+    } else {
+      uri = Uri.parse(value);
+    }
+    
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      if(context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('لا يمكن فتح هذا الرابط: $value')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +104,7 @@ class _RealStateSettingsProviderState extends State<RealStateSettingsProvider> {
       ),
       _SettingsItem(
         label: "اللغة",
-        svgPath: "assets/icons/language.svg", // يمكنك استخدام أيقونة اللغة أو أي أيقونة مناسبة
+        svgPath: "assets/icons/language.svg",
         customWidget: _buildLanguageToggle(orangeColor),
         router: '',
       ),
@@ -101,7 +160,8 @@ class _RealStateSettingsProviderState extends State<RealStateSettingsProvider> {
                 child: Padding(
                   padding: EdgeInsets.symmetric(
                     vertical: 20,
-                    horizontal: constraints.maxWidth > 600 ? constraints.maxWidth * 0.2 : 16,
+                    horizontal:
+                        constraints.maxWidth > 600 ? constraints.maxWidth * 0.2 : 16,
                   ),
                   child: Column(
                     children: [
@@ -111,14 +171,16 @@ class _RealStateSettingsProviderState extends State<RealStateSettingsProvider> {
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: ListView.separated(
-                          separatorBuilder: (c, i) => const Divider(height: 0, color: Color(0xFFF1F1F1)),
+                          separatorBuilder: (c, i) =>
+                              const Divider(height: 0, color: Color(0xFFF1F1F1)),
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           itemCount: items.length,
                           itemBuilder: (context, index) {
                             final item = items[index];
                             return ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                              contentPadding:
+                                  const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
                               leading: SvgPicture.asset(
                                 item.svgPath,
                                 width: 24,
@@ -127,11 +189,13 @@ class _RealStateSettingsProviderState extends State<RealStateSettingsProvider> {
                               ),
                               title: Text(
                                 item.label,
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                                style: const TextStyle(
+                                    fontSize: 16, fontWeight: FontWeight.w500),
                               ),
                               trailing: item.customWidget ??
                                   (item.trailing != null
-                                      ? Icon(Icons.arrow_forward_ios_rounded, color: orangeColor)
+                                      ? Icon(Icons.arrow_forward_ios_rounded,
+                                          color: orangeColor)
                                       : null),
                               onTap: (item.router.isNotEmpty)
                                   ? () => context.push(item.router)
@@ -147,35 +211,21 @@ class _RealStateSettingsProviderState extends State<RealStateSettingsProvider> {
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                       ),
                       const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _SocialIcon(svgPath: "assets/icons/telephone_901122.svg"),
-                          const SizedBox(width: 16),
-                          _SocialIcon(svgPath: "assets/icons/youtube_246153.svg"),
-                          const SizedBox(width: 16),
-                          _SocialIcon(svgPath: "assets/icons/twitter_2335289.svg"),
-                          const SizedBox(width: 16),
-                          _SocialIcon(svgPath: "assets/icons/facebook-logo_1384879.svg"),
-                        ],
-                      ),
+                      // --- الجزء الديناميكي لعرض أيقونات التواصل الاجتماعي ---
+                      _buildSocialIconsWidget(),
                       const SizedBox(height: 36),
                       // زرار تسجيل الخروج
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: () 
-                          { // استدعاء دالة logout من الـ Provider
-    context.read<AuthProvider>().logout();
-
-    // ملاحظة: ليس هناك حاجة لعمل context.go('/login') هنا،
-    // لأن GoRouter سيقوم بذلك تلقائيًا عندما يستمع للتغيير.
- },
-                          //=> context.go("/login"),
+                          onPressed: () => context.go("/login"),
                           icon: const Icon(Icons.logout, color: Colors.white, size: 20),
                           label: const Text(
                             "تسجيل الخروج",
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16,color: Colors.white),
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Colors.white),
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.orange,
@@ -185,9 +235,6 @@ class _RealStateSettingsProviderState extends State<RealStateSettingsProvider> {
                             ),
                           ),
                         ),
-
-
-                        
                       ),
                     ],
                   ),
@@ -197,6 +244,55 @@ class _RealStateSettingsProviderState extends State<RealStateSettingsProvider> {
           ),
         ),
       ),
+    );
+  }
+
+  // --- ويدجت بناء أيقونات التواصل الاجتماعي ---
+  Widget _buildSocialIconsWidget() {
+    if (_isLoadingSocials) {
+      return const Center(child: CircularProgressIndicator(color: Color(0xFFFC8700)));
+    }
+    if (_errorMessage != null) {
+      return Text('خطأ: $_errorMessage', style: const TextStyle(color: Colors.red));
+    }
+
+    // خريطة لربط مفاتيح الـ API بمسارات الأيقونات المحلية
+    final Map<String, String> socialKeyToAssetMap = {
+      'facebook_url': "assets/icons/facebook-logo_1384879.svg",
+      'twitter_url': "assets/icons/twitter_2335289.svg",
+      'youtube_url': "assets/icons/youtube_246153.svg",
+      'contact_phones': "assets/icons/telephone_901122.svg",
+    };
+
+    List<Widget> socialIcons = [];
+    
+    socialKeyToAssetMap.forEach((key, assetPath) {
+      if (_appSettings.containsKey(key) && _appSettings[key] != null && _appSettings[key].toString().isNotEmpty) {
+        
+        final value = _appSettings[key] is List ? _appSettings[key][0] : _appSettings[key];
+        
+        socialIcons.add(
+          InkWell(
+            onTap: () => _launchURL(value.toString(), isPhone: key == 'contact_phones'),
+            borderRadius: BorderRadius.circular(12),
+            child: _SocialIcon(svgPath: assetPath),
+          )
+        );
+        socialIcons.add(const SizedBox(width: 16)); // مسافة بين الأيقونات
+      }
+    });
+
+    if (socialIcons.isNotEmpty) {
+      socialIcons.removeLast(); // إزالة آخر مسافة
+    }
+
+    if (socialIcons.isEmpty) {
+      return const Text("لا توجد روابط حاليًا");
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: socialIcons,
     );
   }
 
@@ -259,6 +355,7 @@ class _RealStateSettingsProviderState extends State<RealStateSettingsProvider> {
     );
   }
 
+  // دالة بناء شريط التنقل السفلي
   Widget _buildBottomNavigationBar(BuildContext context, bool isTablet) {
     int currentIndex = 2; // القائمة
 
@@ -273,7 +370,6 @@ class _RealStateSettingsProviderState extends State<RealStateSettingsProvider> {
         case 2:
           context.go('/SettingsProvider');
           break;
-
       }
     }
 
@@ -308,7 +404,7 @@ class _RealStateSettingsProviderState extends State<RealStateSettingsProvider> {
                 final item = navIcons[idx];
                 final selected = idx == currentIndex;
                 Color mainColor =
-                selected ? Colors.orange : const Color(0xFF6B7280);
+                    selected ? Colors.orange : const Color(0xFF6B7280);
 
                 return InkWell(
                   onTap: () => onItemTapped(idx),
@@ -333,7 +429,7 @@ class _RealStateSettingsProviderState extends State<RealStateSettingsProvider> {
                           height: isTablet ? 28 : 24,
                           width: isTablet ? 28 : 24,
                           colorFilter:
-                          ColorFilter.mode(mainColor, BlendMode.srcIn),
+                              ColorFilter.mode(mainColor, BlendMode.srcIn),
                         ),
                         SizedBox(height: isTablet ? 8 : 6),
                         Text(
@@ -341,7 +437,7 @@ class _RealStateSettingsProviderState extends State<RealStateSettingsProvider> {
                           style: TextStyle(
                             fontSize: isTablet ? 14 : 12,
                             fontWeight:
-                            selected ? FontWeight.w700 : FontWeight.w500,
+                                selected ? FontWeight.w700 : FontWeight.w500,
                             color: mainColor,
                           ),
                         ),
@@ -358,6 +454,7 @@ class _RealStateSettingsProviderState extends State<RealStateSettingsProvider> {
   }
 }
 
+// كلاس مساعد لعناصر قائمة الإعدادات
 class _SettingsItem {
   final String label;
   final String svgPath;
@@ -373,6 +470,7 @@ class _SettingsItem {
   });
 }
 
+// ويدجت مساعد لأيقونات التواصل الاجتماعي
 class _SocialIcon extends StatelessWidget {
   final String svgPath;
   const _SocialIcon({required this.svgPath});

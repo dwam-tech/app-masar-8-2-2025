@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:saba2v2/providers/auth_provider.dart';
+import 'package:saba2v2/providers/conversation_provider.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   Future<void> _logout(BuildContext context) async {
-    await context.read<AuthProvider>().logout();
+    final conversationProvider = context.read<ConversationProvider>();
+    await context.read<AuthProvider>().logout(conversationProvider);
     if (context.mounted) {
       context.go('/login');
     }

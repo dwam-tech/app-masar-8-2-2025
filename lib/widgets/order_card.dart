@@ -15,14 +15,36 @@ class OrderCard extends StatelessWidget {
   // الحصول على لون حالة الطلب
   Color _getStatusColor(String status) {
     switch (status) {
-      case "قيد الانتظار":
+      case "pending":
+        return Colors.grey;
+      case "accepted_by_admin":
         return Colors.orange;
-      case "قيد التنفيذ":
+      case "processing":
         return Colors.blue;
-      case "منتهية":
+      case "completed":
         return Colors.green;
+      case "rejected_by_admin":
+        return Colors.red;
       default:
         return Colors.grey;
+    }
+  }
+
+  // ترجمة حالة الطلب للعرض
+  String _getStatusDisplayText(String status) {
+    switch (status) {
+      case "pending":
+        return "معلق";
+      case "accepted_by_admin":
+        return "معتمد من الإدارة";
+      case "processing":
+        return "قيد المعالجة";
+      case "completed":
+        return "مكتمل";
+      case "rejected_by_admin":
+        return "مرفوض من الإدارة";
+      default:
+        return status;
     }
   }
 
@@ -58,7 +80,7 @@ class OrderCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    order.status,
+                    _getStatusDisplayText(order.status),
                     style: TextStyle(
                       color: _getStatusColor(order.status),
                       fontSize: 12,
@@ -145,7 +167,7 @@ class OrderCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 Text(
-                  "#${order.id}",
+                  "#${order.orderNumber}",
                   style: const TextStyle(
                     color: Colors.grey,
                     fontSize: 12,

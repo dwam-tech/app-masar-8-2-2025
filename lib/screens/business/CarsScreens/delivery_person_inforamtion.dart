@@ -37,7 +37,7 @@ class _DeliveryPersonInformationScreenState extends State<DeliveryPersonInformat
   List<bool> _paymentSelections = [false, false];
   final List<String> _rentalTypeLabels = ['تأجير بسائق', 'تأجير بدون سائق'];
   List<bool> _rentalSelections = [false, false];
-  static const String _baseUrl = 'http://192.168.1.8:8000';
+  static const String _baseUrl = 'http://192.168.1.7:8000';
 
   @override
   void dispose() { 

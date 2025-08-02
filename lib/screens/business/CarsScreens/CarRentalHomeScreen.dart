@@ -2,8 +2,12 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
-import 'package:saba2v2/services/ar_rental_office_service.dart'; // تأكد من صحة المسار
+import 'package:provider/provider.dart';
+import 'package:saba2v2/services/ar_rental_office_service.dart';
+import 'package:saba2v2/models/service_request_model.dart';
+import 'package:saba2v2/providers/service_provider_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:timeago/timeago.dart' as timeago;
 
 class CarRentalHomeScreen extends StatefulWidget {
   const CarRentalHomeScreen({super.key});
@@ -13,35 +17,34 @@ class CarRentalHomeScreen extends StatefulWidget {
 }
 
 class _CarRentalHomeScreenState extends State<CarRentalHomeScreen> {
-  // متغيرات الخدمة والبيانات
-  late CarRentalOfficeService _officeService;
+  // خدمات وبيانات
+  CarRentalOfficeService? _officeService;
+  ServiceProviderState? _serviceProvider;
   int? _officeDetailId;
+  String? _userType;
+
+  // متغير حالة لتتبع الطلب الذي يتم التفاعل معه
+  int? _processingRequestId;
 
   // متغيرات حالة المفاتيح
   bool isDeliveryEnabled = false;
   bool isRentalEnabled = false;
 
   // متغيرات حالة التحميل
-  bool isLoadingPage = true; // للتحميل الأولي الكامل للشاشة
-  bool isUpdatingDelivery = false; // لتحديث مفتاح التوصيل فقط
-  bool isUpdatingRental = false; // لتحديث مفتاح التأجير فقط
+  bool isLoadingPage = true;
+  bool isUpdatingDelivery = false;
+  bool isUpdatingRental = false;
 
   // متغيرات حالة الواجهة
-  int selectedTab = 0; // 0: قيد الانتظار, 1: منتهية
-
-  // بيانات الطلبات (يمكنك استبدالها ببيانات من الـ API لاحقًا)
-  List<Map<String, dynamic>> requests = [
-    {"id": "1", "type": "نوع الطلب: توصيل", "client": "عبدالله حمد", "since": "منذ دقيقة", "offer": "العرض المقدم: 23", "FromLocation": "التجمع الخامس", "ToLocation": "الزمالك", "status": "قيد الانتظار", "price": 2800, "canPropose": true},
-    {"id": "3", "type": "نوع الطلب: توصيل", "client": "محمد أحمد", "since": "منذ ساعتين", "offer": "العرض المقدم: 15", "FromLocation": "مدينة نصر", "ToLocation": "وسط البلد", "status": "منتهية", "price": 2000, "canPropose": false},
-  ];
+  int selectedTab = 0; // 0: انتظار, 1: تنفيذ, 2: منتهية
 
   @override
   void initState() {
     super.initState();
+    timeago.setLocaleMessages('ar', timeago.ArMessages());
     _loadInitialData();
   }
 
-  /// دالة مركزية لجلب البيانات الأولية عند بدء تشغيل الشاشة
   Future<void> _loadInitialData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -49,34 +52,98 @@ class _CarRentalHomeScreenState extends State<CarRentalHomeScreen> {
       final userJsonString = prefs.getString('user_data');
 
       if (token == null || token.isEmpty || userJsonString == null || userJsonString.isEmpty) {
-        throw Exception("بيانات المستخدم غير مكتملة، يرجى إعادة تسجيل الدخول.");
+        throw Exception("بيانات المستخدم غير مكتملة.");
       }
 
       _officeService = CarRentalOfficeService(token: token);
-
+      _serviceProvider = ServiceProviderState(service: _officeService!);
+      
       final userMap = jsonDecode(userJsonString);
-      final officeDetail = userMap['car_rental']?['office_detail'];
+      _userType = userMap['user_type'];
 
-      if (officeDetail != null) {
-        if (mounted) {
-          setState(() {
-            _officeDetailId = officeDetail['id'];
-            isDeliveryEnabled = (officeDetail['is_available_for_delivery'] == true || officeDetail['is_available_for_delivery'] == 1);
-            isRentalEnabled = (officeDetail['is_available_for_rent'] == true || officeDetail['is_available_for_rent'] == 1);
-            isLoadingPage = false;
-          });
+      if (_userType == 'car_rental_office') {
+        final officeDetail = userMap['car_rental']?['office_detail'];
+        if (officeDetail != null) {
+          _officeDetailId = officeDetail['id'];
+          isDeliveryEnabled = (officeDetail['is_available_for_delivery'] == true || officeDetail['is_available_for_delivery'] == 1);
+          isRentalEnabled = (officeDetail['is_available_for_rent'] == true || officeDetail['is_available_for_rent'] == 1);
         }
-      } else {
-        throw Exception("لا توجد تفاصيل للمكتب مرتبطة بهذا الحساب.");
       }
+      
+      // جلب بيانات كل الطلبات باستخدام الـ Provider الجديد
+      await _serviceProvider?.fetchAllRequests();
+      _serviceProvider?.startAutoRefresh();
+
     } catch (e) {
       if (mounted) {
-        setState(() => isLoadingPage = false);
+        debugPrint("خطأ في تهيئة البيانات: $e");
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text("خطأ في تهيئة البيانات: $e"),
+          content: Text("خطأ: $e"),
           backgroundColor: Colors.red,
         ));
       }
+    } finally {
+      if (mounted) {
+        setState(() => isLoadingPage = false);
+      }
+    }
+  }
+
+  Future<void> _acceptRequest(ServiceRequest request) async {
+    if (_serviceProvider == null) return;
+    
+    setState(() => _processingRequestId = request.id);
+    try {
+      final success = await _serviceProvider!.acceptRequest(request.id);
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text("تم قبول الطلب بنجاح"),
+          backgroundColor: Colors.green,
+        ));
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("فشل في قبول الطلب: ${_serviceProvider?.error ?? 'خطأ غير معروف'}"),
+          backgroundColor: Colors.red,
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("خطأ: ${e.toString().replaceAll("Exception: ", "")}"),
+          backgroundColor: Colors.red,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _processingRequestId = null);
+    }
+  }
+
+  Future<void> _completeRequest(ServiceRequest request) async {
+    if (_serviceProvider == null) return;
+    
+    setState(() => _processingRequestId = request.id);
+    try {
+      final success = await _serviceProvider!.completeRequest(request.id);
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text("تم إنهاء الطلب بنجاح"),
+          backgroundColor: Colors.green,
+        ));
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("فشل في إنهاء الطلب: ${_serviceProvider?.error ?? 'خطأ غير معروف'}"),
+          backgroundColor: Colors.red,
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("خطأ: ${e.toString().replaceAll("Exception: ", "")}"),
+          backgroundColor: Colors.red,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _processingRequestId = null);
     }
   }
 
@@ -85,38 +152,56 @@ class _CarRentalHomeScreenState extends State<CarRentalHomeScreen> {
     final isTablet = MediaQuery.of(context).size.width > 600;
     final screenWidth = MediaQuery.of(context).size.width;
 
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        backgroundColor: const Color(0xFFF8F9FA),
-        body: SafeArea(
-          child: isLoadingPage
-              ? const Center(child: CircularProgressIndicator())
-              : Column(
-            children: [
-              _buildAppBar(context, isTablet),
-              _buildSwitchesSection(isTablet, screenWidth),
-              _buildTabsSection(screenWidth),
-              Expanded(
-                child: ListView.builder(
-                  padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.02, vertical: 8),
-                  itemCount: requests.where((req) => (selectedTab == 0 ? req['status'] == "قيد الانتظار" : req['status'] == "منتهية")).length,
-                  itemBuilder: (context, index) {
-                    final filteredRequests = requests.where((req) => (selectedTab == 0 ? req['status'] == "قيد الانتظار" : req['status'] == "منتهية")).toList();
-                    return _buildRequestCard(filteredRequests[index], isTablet, screenWidth);
-                  },
-                ),
-              ),
-            ],
+    // إذا لم يتم تهيئة الـ Provider بعد، عرض شاشة التحميل
+    if (_serviceProvider == null) {
+      return Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          backgroundColor: const Color(0xFFF8F9FA),
+          body: const SafeArea(
+            child: Center(child: CircularProgressIndicator()),
           ),
         ),
-        bottomNavigationBar: _buildBottomNavigationBar(context, isTablet),
+      );
+    }
+
+    return ChangeNotifierProvider.value(
+      value: _serviceProvider!,
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          backgroundColor: const Color(0xFFF8F9FA),
+          body: SafeArea(
+            child: isLoadingPage
+                ? const Center(child: CircularProgressIndicator())
+                : Column(
+                    children: [
+                      _buildAppBar(context, isTablet),
+                      if (_userType == 'car_rental_office')
+                        _buildSwitchesSection(isTablet, screenWidth),
+                      _buildTabsSection(screenWidth),
+                      Expanded(
+                        child: Consumer<ServiceProviderState>(
+                          builder: (context, provider, child) {
+                            if (provider.isLoading && provider.allRequests.isEmpty) {
+                              return const Center(child: CircularProgressIndicator(color: Colors.orange));
+                            }
+                            return _buildRequestsList(isTablet, screenWidth);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+          bottomNavigationBar: _buildBottomNavigationBar(context, isTablet),
+        ),
       ),
     );
   }
 
-  // ودجات بناء الواجهة الفرعية (Builders)
+  // --- ودجات بناء الواجهة الفرعية ---
 
+  
   Widget _buildAppBar(BuildContext context, bool isTablet) {
     return Container(
       decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 2))]),
@@ -153,11 +238,21 @@ class _CarRentalHomeScreenState extends State<CarRentalHomeScreen> {
             value: isDeliveryEnabled,
             isLoading: isUpdatingDelivery,
             onChanged: (newValue) async {
-              if (_officeDetailId == null) return;
+              if (_officeDetailId == null || _serviceProvider == null) return;
               setState(() => isUpdatingDelivery = true);
               try {
-                await _officeService.updateAvailability(officeDetailId: _officeDetailId!, isAvailableForDelivery: newValue);
-                if(mounted) setState(() => isDeliveryEnabled = newValue);
+                final success = await _serviceProvider!.updateAvailability(
+                  officeDetailId: _officeDetailId!,
+                  isAvailableForDelivery: newValue,
+                );
+                if (success && mounted) {
+                  setState(() => isDeliveryEnabled = newValue);
+                } else if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text("فشل تحديث الحالة: ${_serviceProvider?.error ?? 'خطأ غير معروف'}"),
+                    backgroundColor: Colors.red,
+                  ));
+                }
               } catch (e) {
                 if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("فشل تحديث الحالة: $e"), backgroundColor: Colors.red));
               } finally {
@@ -171,11 +266,21 @@ class _CarRentalHomeScreenState extends State<CarRentalHomeScreen> {
             value: isRentalEnabled,
             isLoading: isUpdatingRental,
             onChanged: (newValue) async {
-              if (_officeDetailId == null) return;
+              if (_officeDetailId == null || _serviceProvider == null) return;
               setState(() => isUpdatingRental = true);
               try {
-                await _officeService.updateAvailability(officeDetailId: _officeDetailId!, isAvailableForRent: newValue);
-                if(mounted) setState(() => isRentalEnabled = newValue);
+                final success = await _serviceProvider!.updateAvailability(
+                  officeDetailId: _officeDetailId!,
+                  isAvailableForRent: newValue,
+                );
+                if (success && mounted) {
+                  setState(() => isRentalEnabled = newValue);
+                } else if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text("فشل تحديث الحالة: ${_serviceProvider?.error ?? 'خطأ غير معروف'}"),
+                    backgroundColor: Colors.red,
+                  ));
+                }
               } catch (e) {
                 if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("فشل تحديث الحالة: $e"), backgroundColor: Colors.red));
               } finally {
@@ -205,47 +310,183 @@ class _CarRentalHomeScreenState extends State<CarRentalHomeScreen> {
     );
   }
 
+
+  /// --- [تم تعديل هذه الدالة بالكامل] ---
   Widget _buildTabsSection(double screenWidth) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.03, vertical: 8),
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color.fromRGBO(222, 220, 217, 1), width: 1)),
-        child: Row(children: [
-          Expanded(child: ElevatedButton(onPressed: () => setState(() => selectedTab = 0), style: ElevatedButton.styleFrom(backgroundColor: selectedTab == 0 ? Colors.orange : Colors.white, foregroundColor: selectedTab == 0 ? Colors.white : Colors.orange, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: const BorderSide(color: Colors.orange, width: 1.2)), padding: const EdgeInsets.symmetric(vertical: 10)), child: const Text('قيد الانتظار', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)))),
-          SizedBox(width: screenWidth * 0.02),
-          Expanded(child: ElevatedButton(onPressed: () => setState(() => selectedTab = 1), style: ElevatedButton.styleFrom(backgroundColor: selectedTab == 1 ? Colors.orange : Colors.white, foregroundColor: selectedTab == 1 ? Colors.white : Colors.orange, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: const BorderSide(color: Colors.orange, width: 1.2)), padding: const EdgeInsets.symmetric(vertical: 10)), child: const Text('منتهية', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)))),
-        ]),
+    final List<String> tabTitles = ["قيد الانتظار", "قيد التنفيذ", "منتهية"];
+    
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: screenWidth * 0.03, vertical: 8),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 8)]
+      ),
+      child: Row(
+        children: List.generate(tabTitles.length, (index) {
+          final isSelected = selectedTab == index;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => selectedTab = index),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.orange : Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  tabTitles[index],
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : Colors.black87,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
       ),
     );
   }
 
-  Widget _buildRequestCard(Map<String, dynamic> req, bool isTablet, double screenWidth) {
-    bool isFinished = req['status'] == "منتهية";
+  /// --- [تم تعديل هذه الدالة بالكامل] ---
+  Widget _buildRequestsList(bool isTablet, double screenWidth) {
+    return Consumer<ServiceProviderState>(
+      builder: (context, provider, child) {
+        // اختيار القائمة الصحيحة بناءً على التبويب المختار
+        List<ServiceRequest> currentList;
+        String emptyMessage;
+
+        switch (selectedTab) {
+          case 0:
+            currentList = provider.pendingRequests;
+            emptyMessage = "قيد الانتظار";
+            break;
+          case 1:
+            currentList = provider.acceptedRequests;
+            emptyMessage = "قيد التنفيذ";
+            break;
+          case 2:
+            currentList = provider.completedRequests;
+            emptyMessage = "منتهية";
+            break;
+          default:
+            currentList = [];
+            emptyMessage = "";
+        }
+
+        if (currentList.isEmpty) {
+          return Center(child: Text("لا توجد طلبات في قسم '$emptyMessage' حاليًا", style: const TextStyle(fontSize: 16, color: Colors.grey)));
+        }
+
+        return ListView.builder(
+          padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.02, vertical: 8),
+          itemCount: currentList.length,
+          itemBuilder: (context, index) {
+            final serviceRequest = currentList[index];
+            return _buildRequestCard(serviceRequest, isTablet, screenWidth);
+          },
+        );
+      },
+    );
+  }
+
+  /// --- [تم تعديل هذه الدالة بالكامل] ---
+  Widget _buildRequestCard(ServiceRequest request, bool isTablet, double screenWidth) {
+    bool isRentRequest = request.type == "rent";
+
+    // تحديد البيانات بناءً على نوع الطلب
+    String typeText = isRentRequest ? "نوع الطلب: تأجير" : "نوع الطلب: توصيل";
+    String clientText = isRentRequest ? "موديل: ${request.requestData.carModel ?? 'غير محدد'}" : "طلب توصيل #${request.id}";
+    String offerText = isRentRequest ? "الفئة: ${request.requestData.carCategory ?? 'غير محدد'}" : "المحافظة: ${request.governorate}";
+    String fromText = isRentRequest ? "من تاريخ: ${request.requestData.fromDate ?? '-'}" : request.requestData.fromLocation ?? '-';
+    String toText = isRentRequest ? "إلى تاريخ: ${request.requestData.toDate ?? '-'}" : request.requestData.toLocation ?? '-';
+
     return Container(
       margin: EdgeInsets.only(bottom: screenWidth * 0.03),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 3))]),
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.04, vertical: 20),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [Icon(Icons.directions_car, color: Colors.orange[700], size: isTablet ? 22 : 18), SizedBox(width: screenWidth * 0.01), Text(req['type'] ?? "", style: TextStyle(fontWeight: FontWeight.w600, fontSize: isTablet ? 16 : 14)), const Spacer(), Icon(Icons.access_time, color: Colors.grey, size: isTablet ? 18 : 15), SizedBox(width: screenWidth * 0.01), Text(req['since'] ?? "", style: TextStyle(fontSize: isTablet ? 14 : 12, color: Colors.grey))]),
+          Row(children: [Icon(Icons.directions_car, color: Colors.orange[700], size: isTablet ? 22 : 18), SizedBox(width: screenWidth * 0.01), Text(typeText, style: TextStyle(fontWeight: FontWeight.w600, fontSize: isTablet ? 16 : 14)), const Spacer(), Icon(Icons.access_time, color: Colors.grey, size: isTablet ? 18 : 15), SizedBox(width: screenWidth * 0.01), Text(timeago.format(request.createdAt, locale: 'ar'), style: TextStyle(fontSize: isTablet ? 14 : 12, color: Colors.grey))]),
           SizedBox(height: screenWidth * 0.02),
-          Row(children: [Icon(Icons.person, color: Colors.grey[600], size: isTablet ? 19 : 16), SizedBox(width: screenWidth * 0.01), Text(req['client'] ?? "", style: TextStyle(fontSize: isTablet ? 16 : 14, fontWeight: FontWeight.w500)), const Spacer(), Icon(Icons.local_offer, color: Colors.green[700], size: isTablet ? 19 : 16), SizedBox(width: screenWidth * 0.01), Text(req['offer'] ?? "", style: TextStyle(fontSize: isTablet ? 15 : 13, color: Colors.green))]),
+          Row(children: [Icon(Icons.person, color: Colors.grey[600], size: isTablet ? 19 : 16), SizedBox(width: screenWidth * 0.01), Text(clientText, style: TextStyle(fontSize: isTablet ? 16 : 14, fontWeight: FontWeight.w500)), const Spacer(), Icon(Icons.local_offer, color: Colors.green[700], size: isTablet ? 19 : 16), SizedBox(width: screenWidth * 0.01), Text(offerText, style: TextStyle(fontSize: isTablet ? 15 : 13, color: Colors.green))]),
           Divider(color: Colors.grey[300], thickness: 1, height: 24, indent: 16, endIndent: 16),
-          Row(children: [Icon(Icons.location_on, color: Colors.orange, size: isTablet ? 19 : 16), SizedBox(width: screenWidth * 0.01), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text("من", style: TextStyle(fontSize: isTablet ? 15 : 13, color: Colors.black54)), Text(req['ToLocation'] ?? "", style: TextStyle(fontSize: isTablet ? 15 : 13, color: Colors.black, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis)]))]),
+          Row(children: [Icon(Icons.location_on, color: Colors.orange, size: isTablet ? 19 : 16), SizedBox(width: screenWidth * 0.01), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text("من", style: TextStyle(fontSize: isTablet ? 15 : 13, color: Colors.black54)), Text(fromText, style: TextStyle(fontSize: isTablet ? 15 : 13, color: Colors.black, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis)]))]),
           SizedBox(height: screenWidth * 0.02),
-          Row(children: [Icon(Icons.location_on, color: Colors.orange, size: isTablet ? 19 : 16), SizedBox(width: screenWidth * 0.01), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text("إلى", style: TextStyle(fontSize: isTablet ? 15 : 13, color: Colors.black54)), Text(req['FromLocation'] ?? "", style: TextStyle(fontSize: isTablet ? 15 : 13, color: Colors.black, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis)]))]),
+          Row(children: [Icon(Icons.location_on, color: Colors.orange, size: isTablet ? 19 : 16), SizedBox(width: screenWidth * 0.01), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text("إلى", style: TextStyle(fontSize: isTablet ? 15 : 13, color: Colors.black54)), Text(toText, style: TextStyle(fontSize: isTablet ? 15 : 13, color: Colors.black, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis)]))]),
           SizedBox(height: screenWidth * 0.03),
-          if (!isFinished) ...[
-            SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () => context.push("/OrderDetails"), style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 13), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), elevation: 1), child: Padding(padding: const EdgeInsets.symmetric(horizontal: 20.0), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text("قبول العرض", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)), Row(children: [Text("${req['price']}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)), const Text(" ج.م", style: TextStyle(fontSize: 14))])])))),
-            const SizedBox(height: 10),
-            Center(child: req['canPropose'] ? Text('يمكنك تقديم عرض سعر', style: TextStyle(color: Colors.orange[700], fontWeight: FontWeight.bold, fontSize: isTablet ? 15 : 13, decoration: TextDecoration.underline, decorationColor: Colors.orange[700], decorationThickness: 2)) : const SizedBox()),
-          ],
-          if (isFinished) Center(child: Text('تم الانتهاء من الطلب', style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold, fontSize: isTablet ? 15 : 13))),
+
+          // --- [الجزء الأهم: الزر الديناميكي] ---
+          if (selectedTab == 0) // تبويب قيد الانتظار
+            _buildActionButtonForCard(
+              title: "قبول الطلب",
+              price: request.requestData.price,
+              color: Colors.green,
+              isLoading: _processingRequestId == request.id,
+              onPressed: () => _acceptRequest(request),
+            ),
+            
+          if (selectedTab == 1) // تبويب قيد التنفيذ
+            _buildActionButtonForCard(
+              title: "إنهاء الطلب",
+              price: request.requestData.price,
+              color: Colors.red,
+              isLoading: _processingRequestId == request.id,
+              onPressed: () => _completeRequest(request),
+            ),
+            
+          if (selectedTab == 2) // تبويب منتهية
+             Center(child: Text('تم الانتهاء من هذا الطلب', style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold, fontSize: isTablet ? 15 : 13))),
+
         ]),
       ),
     );
   }
+
+  /// ودجت مساعدة لبناء زر الكارت
+  Widget _buildActionButtonForCard({
+    required String title,
+    int? price,
+    required Color color,
+    required bool isLoading,
+    required VoidCallback onPressed,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: isLoading ? null : onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 13),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          elevation: 1
+        ),
+        child: isLoading
+            ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
+            : Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    if (price != null)
+                      Row(children: [
+                        Text("$price", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                        const Text(" ج.م", style: TextStyle(fontSize: 14))
+                      ])
+                  ],
+                ),
+              ),
+      )
+    );
+  }
+
 
   Widget _buildBottomNavigationBar(BuildContext context, bool isTablet) {
     int currentIndex = 0;
@@ -296,5 +537,11 @@ class _CarRentalHomeScreenState extends State<CarRentalHomeScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _serviceProvider?.dispose();
+    super.dispose();
   }
 }

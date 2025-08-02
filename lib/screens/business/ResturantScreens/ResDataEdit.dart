@@ -1,70 +1,83 @@
+// lib/screens/business/ResturantScreens/ResDataEdit.dart
+
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:saba2v2/providers/restaurant_profile_provider.dart';
 
 class ResDataEdit extends StatefulWidget {
   const ResDataEdit({super.key});
-
   @override
   State<ResDataEdit> createState() => _ResDataEditState();
 }
 
 class _ResDataEditState extends State<ResDataEdit> {
   bool isEditMode = false;
-  bool _isLoading = false;
+  
+  // Controllers for TextFields
+  late TextEditingController usernameController;
+  late TextEditingController phoneController;
+  late TextEditingController emailController;
+  late TextEditingController restaurantNameController;
+  late TextEditingController deliveryCostController;
+  late TextEditingController depositAmountController;
+  late TextEditingController maxPeopleController;
+  late TextEditingController notesController;
 
-  // بيانات وهمية (تستبدلها ببيانات حقيقية لاحقاً)
-  String username = "tasty_egypt";
-  String phone = "01012345678";
-  String email = "test.restaurant@email.com";
-  String restaurantName = "مطعم العمدة";
-  String logoUrl = "";
-  List<String> cuisineTypes = ["شرقي", "إيطالي"];
-  List<Map<String, String>> branches = [
-    {"governorate": "القاهرة", "area": "مدينة نصر"},
-    {"governorate": "الجيزة", "area": "الدقي"}
-  ];
-  bool hasDelivery = true;
-  String deliveryCost = "10";
-  bool hasTableReservation = true;
-  bool wantsDeposit = true;
-  String depositAmount = "100";
-  String maxPeople = "8";
-  String notes = "يفضل الحجز قبل الوصول بساعتين.";
-
-  // كنترولرز لوضع التعديل
-  late final TextEditingController usernameController;
-  late final TextEditingController phoneController;
-  late final TextEditingController emailController;
-  late final TextEditingController restaurantNameController;
-  late final TextEditingController deliveryCostController;
-  late final TextEditingController depositAmountController;
-  late final TextEditingController maxPeopleController;
-  late final TextEditingController notesController;
+  bool _controllersInitialized = false;
 
   @override
   void initState() {
     super.initState();
     _initializeControllers();
+    _initializeControllersWithProviderData();
   }
 
   void _initializeControllers() {
-    usernameController = TextEditingController(text: username);
-    phoneController = TextEditingController(text: phone);
-    emailController = TextEditingController(text: email);
-    restaurantNameController = TextEditingController(text: restaurantName);
-    deliveryCostController = TextEditingController(text: deliveryCost);
-    depositAmountController = TextEditingController(text: depositAmount);
-    maxPeopleController = TextEditingController(text: maxPeople);
-    notesController = TextEditingController(text: notes);
+    usernameController = TextEditingController();
+    phoneController = TextEditingController();
+    emailController = TextEditingController();
+    restaurantNameController = TextEditingController();
+    deliveryCostController = TextEditingController();
+    depositAmountController = TextEditingController();
+    maxPeopleController = TextEditingController();
+    notesController = TextEditingController();
+  }
+
+  /// Initialize controllers AFTER the data is fetched by the provider.
+  void _initializeControllersWithProviderData() {
+    final provider = context.read<RestaurantProfileProvider>();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await provider.fetchDetails(); // Fetch data first
+      _syncControllersWithProvider(); // Then sync controllers
+    });
+  }
+
+  /// Syncs TextField controllers with the latest data from the provider.
+  void _syncControllersWithProvider() {
+    final provider = context.read<RestaurantProfileProvider>();
+    final user = provider.restaurantData;
+    final details = user?['restaurant_detail'];
+    
+    usernameController.text = user?['name'] ?? '';
+    phoneController.text = user?['phone'] ?? '';
+    emailController.text = user?['email'] ?? '';
+    restaurantNameController.text = details?['restaurant_name'] ?? '';
+    deliveryCostController.text = details?['delivery_cost_per_km']?.toString() ?? '0';
+    depositAmountController.text = details?['deposit_amount']?.toString() ?? '0';
+    maxPeopleController.text = details?['max_people_per_reservation']?.toString() ?? '0';
+    notesController.text = details?['reservation_notes'] ?? '';
+    
+    _controllersInitialized = true;
+    // Refresh the widget tree to show the new values.
+    if(mounted) setState(() {});
   }
 
   @override
   void dispose() {
-    _disposeControllers();
-    super.dispose();
-  }
-
-  void _disposeControllers() {
+    // Dispose all controllers
     usernameController.dispose();
     phoneController.dispose();
     emailController.dispose();
@@ -73,154 +86,164 @@ class _ResDataEditState extends State<ResDataEdit> {
     depositAmountController.dispose();
     maxPeopleController.dispose();
     notesController.dispose();
+    super.dispose();
   }
 
-  // دالة لحفظ البيانات
+  /// Handles logo upload
+  Future<void> _pickAndUploadLogo() async {
+    final provider = context.read<RestaurantProfileProvider>();
+    final XFile? image = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 70);
+    if (image != null) {
+      // The provider handles loading state and UI updates
+      await provider.uploadDocument('logo_image', File(image.path));
+      if (provider.error != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(provider.error!), backgroundColor: Colors.red));
+      }
+    }
+  }
+
+  /// Collects data from controllers and saves it
   Future<void> _saveData() async {
-    setState(() => _isLoading = true);
-
-    // محاكاة عملية الحفظ
-    await Future.delayed(const Duration(milliseconds: 800));
-
-    setState(() {
-      username = usernameController.text;
-      phone = phoneController.text;
-      email = emailController.text;
-      restaurantName = restaurantNameController.text;
-      deliveryCost = deliveryCostController.text;
-      depositAmount = depositAmountController.text;
-      maxPeople = maxPeopleController.text;
-      notes = notesController.text;
-      isEditMode = false;
-      _isLoading = false;
-    });
-
-    // عرض رسالة نجاح
+    final provider = context.read<RestaurantProfileProvider>();
+    
+    // Update the provider's data with the current controller values
+    if (provider.restaurantData != null) {
+      provider.restaurantData!['name'] = usernameController.text;
+      provider.restaurantData!['phone'] = phoneController.text;
+      
+      if (provider.restaurantData!['restaurant_detail'] != null) {
+        provider.restaurantData!['restaurant_detail']['restaurant_name'] = restaurantNameController.text;
+        provider.restaurantData!['restaurant_detail']['delivery_cost_per_km'] = double.tryParse(deliveryCostController.text) ?? 0;
+        provider.restaurantData!['restaurant_detail']['deposit_amount'] = double.tryParse(depositAmountController.text) ?? 0;
+        provider.restaurantData!['restaurant_detail']['max_people_per_reservation'] = int.tryParse(maxPeopleController.text) ?? 0;
+        provider.restaurantData!['restaurant_detail']['reservation_notes'] = notesController.text;
+      }
+    }
+    
+    // Call the provider's save method
+    final success = await provider.saveChanges();
+    
+    // Show feedback
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('تم حفظ البيانات بنجاح'),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('تم الحفظ بنجاح'), backgroundColor: Colors.green,
+        ));
+        setState(() => isEditMode = false);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(provider.error ?? 'فشل حفظ البيانات'), backgroundColor: Colors.red,
+        ));
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        backgroundColor: const Color(0xFFF8F9FA),
-        appBar: _buildAppBar(),
-        body: _buildBody(),
-      ),
+    // The main widget is a Consumer that listens for changes
+    return Consumer<RestaurantProfileProvider>(
+      builder: (context, provider, child) {
+        // Show a loading screen while initial data is being fetched
+        if (provider.isLoading && provider.restaurantData == null) {
+          return Scaffold(appBar: _buildAppBar(provider), body: const Center(child: CircularProgressIndicator(color: Colors.orange)));
+        }
+        
+        // Show an error screen if fetching failed
+        if (provider.error != null && provider.restaurantData == null) {
+          return Scaffold(appBar: _buildAppBar(provider), body: Center(child: Text('خطأ: ${provider.error}')));
+        }
+        
+        // Main UI after data is loaded
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            backgroundColor: const Color(0xFFF8F9FA),
+            appBar: _buildAppBar(provider),
+            body: _buildBody(provider),
+          ),
+        );
+      },
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
+  // --- BUILD METHODS ---
+  
+  PreferredSizeWidget _buildAppBar(RestaurantProfileProvider provider) {
     return AppBar(
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_rounded),
-        onPressed: () => context.go("/RestaurantEditProfile"),
-        style: IconButton.styleFrom(
-          foregroundColor:  Colors.orange ,
-        ),
-      ),
-      title: const Text(
-        'بيانات المطعم',
-        style: TextStyle(
-          fontWeight: FontWeight.w700,
-          fontSize: 20,
-          color: Colors.orange,
-        ),
-      ),
       backgroundColor: Colors.white,
       elevation: 0,
-      shadowColor: Colors.black12,
-      surfaceTintColor: Colors.transparent,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios, color: Colors.orange),
+        onPressed: () => context.pop(),
+      ),
+      title: const Text(
+        'تعديل بيانات المطعم',
+        style: TextStyle(
+          color: Colors.black87,
+          fontWeight: FontWeight.bold,
+          fontSize: 18,
+        ),
+      ),
+      centerTitle: true,
       actions: [
-        Container(
-          margin: const EdgeInsets.only(left: 16),
-          child: _isLoading
-              ? const SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: Colors.orange,
-            ),
-          )
-              : IconButton(
+        if (provider.isLoading) 
+          const Padding(
+            padding: EdgeInsets.all(16.0), 
+            child: SizedBox(
+              width: 24, 
+              height: 24, 
+              child: CircularProgressIndicator(strokeWidth: 3, color: Colors.orange)
+            )
+          ),
+        if (!provider.isLoading) 
+          IconButton(
             icon: Icon(
-              isEditMode ? Icons.save_rounded : Icons.edit_rounded,
-              color: Colors.orange,
+              isEditMode ? Icons.save_rounded : Icons.edit_rounded, 
+              color: Colors.orange
             ),
-            tooltip: isEditMode ? 'حفظ' : 'تعديل',
-            onPressed: () async {
+            onPressed: () {
               if (isEditMode) {
-                await _saveData();
+                _saveData(); 
               } else {
                 setState(() => isEditMode = true);
               }
             },
-            style: IconButton.styleFrom(
-              backgroundColor: const Color(0xFFFF6B35).withOpacity(0.1),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              minimumSize: const Size(44, 44),
-            ),
           ),
-        ),
       ],
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(RestaurantProfileProvider provider) {
+    final user = provider.restaurantData;
+    final details = user?['restaurant_detail'];
+    
+    // If details are somehow null after loading, show an error.
+    if(user == null || details == null) {
+      return const Center(child: Text("لا توجد بيانات لعرضها."));
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isTablet = constraints.maxWidth > 768;
-        final isDesktop = constraints.maxWidth > 1200;
-
-        double horizontalPadding;
-        if (isDesktop) {
-          horizontalPadding = constraints.maxWidth * 0.25;
-        } else if (isTablet) {
-          horizontalPadding = constraints.maxWidth * 0.15;
-        } else {
-          horizontalPadding = 16;
-        }
-
+        double horizontalPadding = constraints.maxWidth > 600 ? 40 : 16;
+        
         return Container(
-          width: double.infinity,
           padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16),
           child: Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-              side: BorderSide(
-                color: Colors.grey.shade200,
-                width: 1,
-              ),
-            ),
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: SingleChildScrollView(
-              padding: EdgeInsets.all(isTablet ? 32 : 24),
+              padding: const EdgeInsets.all(24),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildAccountSection(),
+                  _buildAccountSection(user),
                   _buildDivider(),
-                  _buildRestaurantInfoSection(),
+                  _buildRestaurantInfoSection(details),
                   _buildDivider(),
-                  _buildCuisineTypesSection(),
+                  _buildLogoSection(details),
                   _buildDivider(),
-                  _buildBranchesSection(),
+                  _buildDeliverySection(details),
                   _buildDivider(),
-                  _buildServicesSection(),
-                  const SizedBox(height: 32),
+                  _buildReservationSection(details),
                 ],
               ),
             ),
@@ -230,651 +253,303 @@ class _ResDataEditState extends State<ResDataEdit> {
     );
   }
 
-  Widget _buildDivider() {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 32),
-      height: 1,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.transparent,
-            Colors.grey.shade300,
-            Colors.transparent,
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAccountSection() {
+  Widget _buildAccountSection(Map<String, dynamic> user) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionTitle(
-          title: "معلومات الحساب",
-          icon: Icons.person_outline_rounded,
-        ),
-        const SizedBox(height: 20),
+        _SectionTitle(title: 'معلومات الحساب'),
+        const SizedBox(height: 16),
         _buildField(
-          "اسم المستخدم",
-          username,
+          "اسم المستخدم", 
+          user['name'] ?? '', 
           controller: usernameController,
-          icon: Icons.alternate_email_rounded,
+          icon: Icons.person_outline,
         ),
         const SizedBox(height: 16),
         _buildField(
-          "رقم الهاتف",
-          phone,
+          "رقم الهاتف", 
+          user['phone'] ?? '', 
           controller: phoneController,
-          keyboard: TextInputType.phone,
           icon: Icons.phone_outlined,
+          keyboard: TextInputType.phone,
         ),
         const SizedBox(height: 16),
         _buildField(
-          "البريد الإلكتروني",
-          email,
-          controller: emailController,
-          keyboard: TextInputType.emailAddress,
+          "البريد الإلكتروني", 
+          user['email'] ?? '', 
+          controller: emailController, 
+          editable: false,
           icon: Icons.email_outlined,
+          keyboard: TextInputType.emailAddress,
         ),
       ],
     );
   }
 
-  Widget _buildRestaurantInfoSection() {
+  Widget _buildRestaurantInfoSection(Map<String, dynamic> details) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionTitle(
-          title: "معلومات المطعم",
+        _SectionTitle(title: 'معلومات المطعم'),
+        const SizedBox(height: 16),
+        _buildField(
+          "اسم المطعم", 
+          details['restaurant_name'] ?? '', 
+          controller: restaurantNameController,
           icon: Icons.restaurant_outlined,
         ),
-        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  Widget _buildLogoSection(Map<String, dynamic> details) {
+    String logoUrl = details['logo_image'] ?? '';
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionTitle(title: 'شعار المطعم'),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.grey.shade200,
+                ),
+                child: logoUrl.isNotEmpty
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: logoUrl.startsWith('http')
+                            ? Image.network(logoUrl, fit: BoxFit.cover)
+                            : Image.file(File(logoUrl), fit: BoxFit.cover),
+                      )
+                    : const Icon(Icons.restaurant, color: Colors.grey),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'شعار المطعم',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      logoUrl.isNotEmpty ? 'تم رفع الشعار' : 'لم يتم رفع شعار',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isEditMode)
+                ElevatedButton.icon(
+                  onPressed: _pickAndUploadLogo,
+                  icon: const Icon(Icons.upload, size: 18),
+                  label: const Text("تغيير"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDeliverySection(Map<String, dynamic> details) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionTitle(title: 'خدمة التوصيل'),
+        const SizedBox(height: 16),
         _buildField(
-          "اسم المطعم",
-          restaurantName,
-          controller: restaurantNameController,
-          icon: Icons.storefront_outlined,
+          "تكلفة التوصيل لكل كيلومتر", 
+          details['delivery_cost_per_km']?.toString() ?? '0', 
+          controller: deliveryCostController,
+          icon: Icons.delivery_dining_outlined,
+          keyboard: TextInputType.number,
         ),
-        const SizedBox(height: 20),
-        _buildLogoSection(),
       ],
     );
   }
 
-  Widget _buildCuisineTypesSection() {
+  Widget _buildReservationSection(Map<String, dynamic> details) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionTitle(
-          title: "أنواع المطبخ",
-          icon: Icons.restaurant_menu_outlined,
+        _SectionTitle(title: 'حجز الطاولات'),
+        const SizedBox(height: 16),
+        _buildField(
+          "مبلغ العربون", 
+          details['deposit_amount']?.toString() ?? '0', 
+          controller: depositAmountController,
+          icon: Icons.payment_outlined,
+          keyboard: TextInputType.number,
         ),
         const SizedBox(height: 16),
-        _buildCuisineChips(),
-      ],
-    );
-  }
-
-  Widget _buildBranchesSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionTitle(
-          title: "فروع المطعم",
-          icon: Icons.location_on_outlined,
+        _buildField(
+          "أقصى عدد أشخاص للحجز", 
+          details['max_people_per_reservation']?.toString() ?? '0', 
+          controller: maxPeopleController,
+          icon: Icons.people_outline,
+          keyboard: TextInputType.number,
         ),
         const SizedBox(height: 16),
-        _buildBranches(),
-      ],
-    );
-  }
-
-  Widget _buildServicesSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionTitle(
-          title: "خدمات المطعم",
-          icon: Icons.room_service_outlined,
+        _buildField(
+          "ملاحظات الحجز", 
+          details['reservation_notes'] ?? '', 
+          controller: notesController,
+          icon: Icons.note_outlined,
+          maxLines: 3,
         ),
-        const SizedBox(height: 20),
-        _buildDeliverySection(),
-        const SizedBox(height: 24),
-        _buildReservationSection(),
       ],
     );
   }
 
   Widget _buildField(
-      String label,
-      String value, {
-        TextEditingController? controller,
-        TextInputType? keyboard,
-        int maxLines = 1,
-        IconData? icon,
-      }) {
+    String label,
+    String value, {
+    TextEditingController? controller,
+    TextInputType? keyboard,
+    int maxLines = 1,
+    IconData? icon,
+    bool editable = true,
+  }) {
     return Container(
       decoration: BoxDecoration(
-        color: isEditMode ? Colors.grey.shade50 : Colors.transparent,
+        color: (isEditMode && editable) ? Colors.grey.shade50 : Colors.transparent,
         borderRadius: BorderRadius.circular(12),
-        border: isEditMode
+        border: (isEditMode && editable)
             ? Border.all(color: Colors.grey.shade300)
             : Border.all(color: Colors.transparent),
       ),
-      child: isEditMode
+      child: (isEditMode && editable)
           ? TextField(
-        controller: controller,
-        keyboardType: keyboard,
-        maxLines: maxLines,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-          color: Color(0xFF2D3748),
-        ),
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: icon != null
-              ? Icon(icon, color: const Color(0xFFFF6B35), size: 22)
-              : null,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
-          filled: true,
-          fillColor: Colors.white,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 20,
-            vertical: 16,
-          ),
-          labelStyle: TextStyle(
-            color: Colors.grey.shade600,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      )
-          : Container(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            if (icon != null) ...[
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF6B35).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
+              controller: controller,
+              keyboardType: keyboard,
+              maxLines: maxLines,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF2D3748),
+              ),
+              decoration: InputDecoration(
+                labelText: label,
+                prefixIcon: icon != null
+                    ? Icon(icon, color: Colors.orange, size: 22)
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
                 ),
-                child: Icon(
-                  icon,
-                  color: const Color(0xFFFF6B35),
-                  size: 18,
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
+                labelStyle: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-              const SizedBox(width: 12),
-            ],
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            )
+          : Container(
+              padding: const EdgeInsets.all(16),
+              child: Row(
                 children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                      color: Colors.grey.shade600,
+                  if (icon != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        icon,
+                        color: Colors.orange,
+                        size: 18,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    value.isNotEmpty ? value : "غير محدد",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: value.isNotEmpty
-                          ? const Color(0xFF2D3748)
-                          : Colors.grey.shade400,
+                    const SizedBox(width: 12),
+                  ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          label,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          value.isNotEmpty ? value : "غير محدد",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: value.isNotEmpty
+                                ? const Color(0xFF2D3748)
+                                : Colors.grey.shade400,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
     );
   }
 
-  Widget _buildLogoSection() {
+  Widget _buildDivider() {
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFF6B35).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: const Color(0xFFFF6B35).withOpacity(0.3),
-                width: 2,
-              ),
-              image: logoUrl.isNotEmpty
-                  ? DecorationImage(
-                image: NetworkImage(logoUrl),
-                fit: BoxFit.cover,
-              )
-                  : null,
-            ),
-            child: logoUrl.isEmpty
-                ? const Icon(
-              Icons.image_outlined,
-              color: Color(0xFFFF6B35),
-              size: 32,
-            )
-                : null,
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "شعار المطعم",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF2D3748),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  logoUrl.isNotEmpty ? "تم رفع الشعار" : "لم يتم رفع شعار",
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (isEditMode)
-            ElevatedButton.icon(
-              icon: const Icon(Icons.upload_file_rounded, size: 18),
-              label: const Text("تغيير"),
-              onPressed: () {
-                // هنا كود رفع الشعار الفعلي
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF6B35),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCuisineChips() {
-    final allCuisines = ["شرقي", "إيطالي", "غربي", "هندي", "صيني", "مكسيكي", "تايلاندي"];
-
-    return Wrap(
-      spacing: 12,
-      runSpacing: 8,
-      children: isEditMode
-          ? allCuisines.map((type) {
-        final isSelected = cuisineTypes.contains(type);
-        return FilterChip(
-          label: Text(type),
-          selected: isSelected,
-          onSelected: (selected) {
-            setState(() {
-              if (selected) {
-                cuisineTypes.add(type);
-              } else {
-                cuisineTypes.remove(type);
-              }
-            });
-          },
-          backgroundColor: Colors.white,
-          selectedColor: const Color(0xFFFF6B35).withOpacity(0.1),
-          checkmarkColor: const Color(0xFFFF6B35),
-          side: BorderSide(
-            color: isSelected
-                ? const Color(0xFFFF6B35)
-                : Colors.grey.shade300,
-          ),
-          labelStyle: TextStyle(
-            color: isSelected
-                ? const Color(0xFFFF6B35)
-                : Colors.grey.shade700,
-            fontWeight: FontWeight.w500,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-        );
-      }).toList()
-          : cuisineTypes.map((type) {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFF6B35).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: const Color(0xFFFF6B35).withOpacity(0.3),
-            ),
-          ),
-          child: Text(
-            type,
-            style: const TextStyle(
-              color: Color(0xFFFF6B35),
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildBranches() {
-    return Wrap(
-      spacing: 12,
-      runSpacing: 8,
-      children: branches.map((branch) {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.location_on_rounded,
-                size: 16,
-                color: Colors.grey.shade600,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                "${branch['governorate']} - ${branch['area']}",
-                style: TextStyle(
-                  color: Colors.grey.shade700,
-                  fontWeight: FontWeight.w500,
-                  fontSize: 14,
-                ),
-              ),
-              if (isEditMode) ...[
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      branches.remove(branch);
-                    });
-                  },
-                  child: Icon(
-                    Icons.close_rounded,
-                    size: 16,
-                    color: Colors.red.shade400,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildDeliverySection() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: hasDelivery
-            ? const Color(0xFFFF6B35).withOpacity(0.05)
-            : Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: hasDelivery
-              ? const Color(0xFFFF6B35).withOpacity(0.2)
-              : Colors.grey.shade200,
-        ),
-      ),
-      child: Column(
-        children: [
-          _buildSwitchRow(
-            "خدمة التوصيل",
-            hasDelivery,
-            isEditMode,
-                (val) => setState(() => hasDelivery = val),
-            icon: Icons.delivery_dining_outlined,
-          ),
-          if (hasDelivery) ...[
-            const SizedBox(height: 16),
-            _buildField(
-              "سعر التوصيل (جنيه/كيلومتر)",
-              deliveryCost,
-              controller: deliveryCostController,
-              keyboard: TextInputType.number,
-              icon: Icons.payments_outlined,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildReservationSection() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: hasTableReservation
-            ? const Color(0xFFFF6B35).withOpacity(0.05)
-            : Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: hasTableReservation
-              ? const Color(0xFFFF6B35).withOpacity(0.2)
-              : Colors.grey.shade200,
-        ),
-      ),
-      child: Column(
-        children: [
-          _buildSwitchRow(
-            "حجز الطاولات",
-            hasTableReservation,
-            isEditMode,
-                (val) => setState(() {
-              hasTableReservation = val;
-              if (!val) wantsDeposit = false;
-            }),
-            icon: Icons.table_restaurant_outlined,
-          ),
-          if (hasTableReservation) ...[
-            const SizedBox(height: 20),
-            _buildSwitchRow(
-              "يتم أخذ عربون؟",
-              wantsDeposit,
-              isEditMode,
-                  (val) => setState(() => wantsDeposit = val),
-              icon: Icons.account_balance_wallet_outlined,
-            ),
-            if (wantsDeposit) ...[
-              const SizedBox(height: 16),
-              _buildField(
-                "مبلغ العربون (جنيه)",
-                depositAmount,
-                controller: depositAmountController,
-                keyboard: TextInputType.number,
-                icon: Icons.monetization_on_outlined,
-              ),
-            ],
-            const SizedBox(height: 16),
-            _buildField(
-              "الحد الأقصى للأفراد",
-              maxPeople,
-              controller: maxPeopleController,
-              keyboard: TextInputType.number,
-              icon: Icons.groups_outlined,
-            ),
-            const SizedBox(height: 16),
-            _buildField(
-              "ملاحظات للإدارة",
-              notes,
-              controller: notesController,
-              maxLines: 3,
-              icon: Icons.note_outlined,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSwitchRow(
-      String label,
-      bool value,
-      bool canEdit,
-      ValueChanged<bool> onChanged, {
-        IconData? icon,
-      }) {
-    return Row(
-      children: [
-        if (icon != null) ...[
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: value
-                  ? const Color(0xFFFF6B35).withOpacity(0.1)
-                  : Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              icon,
-              size: 18,
-              color: value
-                  ? const Color(0xFFFF6B35)
-                  : Colors.grey.shade600,
-            ),
-          ),
-          const SizedBox(width: 12),
-        ],
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 16,
-              color: Color(0xFF2D3748),
-            ),
-          ),
-        ),
-        canEdit
-            ? Switch(
-          value: value,
-          onChanged: onChanged,
-          activeColor: const Color(0xFFFF6B35),
-          activeTrackColor: const Color(0xFFFF6B35).withOpacity(0.3),
-          inactiveThumbColor: Colors.grey.shade400,
-          inactiveTrackColor: Colors.grey.shade300,
-        )
-            : Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: value ? Colors.green.shade50 : Colors.red.shade50,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: value ? Colors.green.shade200 : Colors.red.shade200,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                value ? Icons.check_circle_rounded : Icons.cancel_rounded,
-                color: value ? Colors.green.shade600 : Colors.red.shade600,
-                size: 16,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                value ? 'مفعل' : 'غير مفعل',
-                style: TextStyle(
-                  color: value ? Colors.green.shade700 : Colors.red.shade700,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+      margin: const EdgeInsets.symmetric(vertical: 24),
+      height: 1,
+      color: Colors.grey.shade200,
     );
   }
 }
 
 class _SectionTitle extends StatelessWidget {
   final String title;
-  final IconData icon;
 
-  const _SectionTitle({
-    required this.title,
-    required this.icon,
-  });
+  const _SectionTitle({required this.title});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFFFF6B35), Color(0xFFFF8F50)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.orange,
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Icon(
-            icon,
-            color: Colors.white,
-            size: 24,
-          ),
-        ),
-        const SizedBox(width: 16),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF2D3748),
-            letterSpacing: -0.5,
-          ),
-        ),
-      ],
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.bold,
+        color: Color(0xFF2D3748),
+      ),
     );
   }
 }

@@ -93,7 +93,7 @@ class _ResturantLawDataState extends State<ResturantLawData> {
 
   Map<String, String?> _localImagePaths = {};
   
-  static const String _baseUrl = 'http://192.168.1.8:8000';
+  static const String _baseUrl = 'http://192.168.1.7:8000';
 
   @override
   void initState() {

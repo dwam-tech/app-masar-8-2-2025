@@ -1,9 +1,10 @@
 import 'dart:io';
-
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:saba2v2/models/MenuSection.dart';
 import 'package:saba2v2/models/MenuItem.dart';
 import 'package:saba2v2/providers/auth_provider.dart';
@@ -18,19 +19,20 @@ class RestaurantMenuScreen extends StatefulWidget {
 
 class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
   int? _selectedSectionId;
+  bool _isDataFetched = false;
 
   @override
-  void initState() {
-    super.initState();
-    // تأخير بسيط لضمان أن الـ Providers متاحة
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isDataFetched) {
       _fetchInitialData();
-    });
+      _isDataFetched = true;
+    }
   }
 
   void _fetchInitialData() {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final restaurantId = authProvider.realEstateId; // نفترض أن هذا هو ID المطعم
+    final restaurantId = authProvider.realEstateId;
 
     if (restaurantId != null) {
       final menuProvider = Provider.of<MenuManagementProvider>(context, listen: false);
@@ -41,13 +43,9 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
           });
         }
       });
-    } else {
-      // التعامل مع حالة عدم وجود ID للمطعم
-      debugPrint("Restaurant ID not found, cannot fetch menu.");
     }
   }
 
-  // --- نافذة إضافة قسم جديد ---
   void _showAddCategoryDialog(BuildContext context) {
     final controller = TextEditingController();
     final menuProvider = Provider.of<MenuManagementProvider>(context, listen: false);
@@ -56,14 +54,14 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('إضافة قسم جديد'),
+        title: const Text('إضافة قسم جديد'),
         content: TextField(
           controller: controller,
-          decoration: InputDecoration(hintText: 'مثال: الحلويات'),
+          decoration: const InputDecoration(hintText: 'مثال: الحلويات'),
           autofocus: true,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text('إلغاء')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
           ElevatedButton(
             onPressed: () async {
               final categoryName = controller.text.trim();
@@ -81,19 +79,18 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
                 }
               }
             },
-            child: Text('إضافة'),
+            child: const Text('إضافة'),
           ),
         ],
       ),
     );
   }
 
-  // --- نافذة إدارة الأقسام ---
   void _showManageCategoriesDialog(BuildContext context, List<MenuSection> sections) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('إدارة الأقسام'),
+        title: const Text('إدارة الأقسام'),
         content: SizedBox(
           width: double.maxFinite,
           child: ListView.builder(
@@ -106,25 +103,24 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
                 title: Text(section.title),
                 trailing: isRemovable
                     ? IconButton(
-                        icon: Icon(Icons.delete, color: Colors.red),
+                        icon: const Icon(Icons.delete, color: Colors.red),
                         onPressed: () async {
                            final menuProvider = Provider.of<MenuManagementProvider>(context, listen: false);
-                           await menuProvider.deleteSection(sectionId: section.id);
                            if (dialogContext.mounted) Navigator.pop(dialogContext);
+                           await menuProvider.deleteSection(sectionId: section.id);
                         },
                       )
                     : null,
-                subtitle: !isRemovable ? Text('يحتوي على وجبات', style: TextStyle(color: Colors.grey, fontSize: 12)) : null,
+                subtitle: !isRemovable ? const Text('يحتوي على وجبات', style: TextStyle(color: Colors.grey, fontSize: 12)) : null,
               );
             },
           ),
         ),
-        actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text('إغلاق'))],
+        actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إغلاق'))],
       ),
     );
   }
 
-  // --- نافذة إضافة وجبة جديدة ---
   void _showAddMealDialog(BuildContext context, List<MenuSection> sections) {
     if (sections.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يجب إضافة قسم أولاً')));
@@ -140,7 +136,7 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setStateDialog) => AlertDialog(
-          title: Text('إضافة وجبة جديدة'),
+          title: const Text('إضافة وجبة جديدة'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -158,16 +154,16 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
                     decoration: BoxDecoration(border: Border.all(color: Colors.orange), borderRadius: BorderRadius.circular(8)),
                     child: pickedImage != null
                         ? ClipRRect(borderRadius: BorderRadius.circular(7), child: Image.file(pickedImage!, fit: BoxFit.cover))
-                        : Center(child: Icon(Icons.add_a_photo, color: Colors.grey)),
+                        : const Center(child: Icon(Icons.add_a_photo, color: Colors.grey)),
                   ),
                 ),
-                SizedBox(height: 16),
-                TextField(controller: nameController, decoration: InputDecoration(labelText: 'اسم الوجبة')),
-                SizedBox(height: 8),
-                TextField(controller: descController, decoration: InputDecoration(labelText: 'الوصف')),
-                SizedBox(height: 8),
-                TextField(controller: priceController, decoration: InputDecoration(labelText: 'السعر'), keyboardType: TextInputType.number),
-                SizedBox(height: 8),
+                const SizedBox(height: 16),
+                TextField(controller: nameController, decoration: const InputDecoration(labelText: 'اسم الوجبة')),
+                const SizedBox(height: 8),
+                TextField(controller: descController, decoration: const InputDecoration(labelText: 'الوصف')),
+                const SizedBox(height: 8),
+                TextField(controller: priceController, decoration: const InputDecoration(labelText: 'السعر'), keyboardType: TextInputType.number),
+                const SizedBox(height: 8),
                 DropdownButton<int>(
                   isExpanded: true,
                   value: selectedSectionIdForDialog,
@@ -180,7 +176,7 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text('إلغاء')),
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
             ElevatedButton(
               onPressed: () async {
                 if (pickedImage == null || nameController.text.trim().isEmpty || priceController.text.trim().isEmpty) {
@@ -203,7 +199,7 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
                   ));
                 }
               },
-              child: Text('إضافة'),
+              child: const Text('إضافة'),
             ),
           ],
         ),
@@ -211,18 +207,158 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
     );
   }
 
+  void _showMealDetailsDialog(BuildContext context, MenuItem meal, int sectionId) {
+    final nameController = TextEditingController(text: meal.name);
+    final descController = TextEditingController(text: meal.description);
+    final priceController = TextEditingController(text: meal.price.toStringAsFixed(0));
+    File? pickedImage;
+    bool isEditing = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            final menuProvider = Provider.of<MenuManagementProvider>(context, listen: false);
+
+            void handleDelete() async {
+              bool confirmDelete = await showDialog(
+                context: context,
+                builder: (confirmCtx) => AlertDialog(
+                  title: const Text('تأكيد الحذف'),
+                  content: const Text('هل أنت متأكد من رغبتك في حذف هذه الوجبة؟'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.of(confirmCtx).pop(false), child: const Text('إلغاء')),
+                    TextButton(onPressed: () => Navigator.of(confirmCtx).pop(true), child: const Text('حذف', style: TextStyle(color: Colors.red))),
+                  ],
+                ),
+              ) ?? false;
+
+              if (confirmDelete && dialogContext.mounted) {
+                Navigator.pop(dialogContext);
+                final success = await menuProvider.deleteMenuItem(sectionId: sectionId, itemId: meal.id);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(success ? 'تم حذف الوجبة بنجاح' : menuProvider.error ?? 'فشل حذف الوجبة'),
+                  backgroundColor: success ? Colors.green : Colors.red,
+                ));
+              }
+            }
+
+            void handleSaveChanges() async {
+              final success = await menuProvider.updateMenuItem(
+                sectionId: sectionId, 
+                originalMeal: meal, 
+                name: nameController.text.trim(), 
+                description: descController.text.trim(), 
+                price: double.tryParse(priceController.text.trim()) ?? 0.0,
+                newImageFile: pickedImage
+              );
+               if (dialogContext.mounted) Navigator.pop(dialogContext);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(success ? 'تم تعديل الوجبة بنجاح' : menuProvider.error ?? 'فشل تعديل الوجبة'),
+                  backgroundColor: success ? Colors.green : Colors.red,
+                ));
+            }
+
+            return AlertDialog(
+              title: Text(isEditing ? 'تعديل الوجبة' : 'تفاصيل الوجبة'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    GestureDetector(
+                      onTap: !isEditing ? null : () async {
+                        final picker = ImagePicker();
+                        final image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+                        if (image != null) {
+                          setStateDialog(() => pickedImage = File(image.path));
+                        }
+                      },
+                      child: Container(
+                        height: 150, width: double.infinity,
+                        decoration: BoxDecoration(border: Border.all(color: Colors.orange), borderRadius: BorderRadius.circular(8)),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            if (pickedImage != null)
+                              ClipRRect(borderRadius: BorderRadius.circular(7), child: Image.file(pickedImage!, width: double.infinity, fit: BoxFit.cover))
+                            else
+                              ClipRRect(borderRadius: BorderRadius.circular(7), child: CachedNetworkImage(imageUrl: meal.imageUrl, width: double.infinity, fit: BoxFit.cover, errorWidget: (c, u, e) => const Icon(Icons.broken_image))),
+                            if (isEditing)
+                              Container(color: Colors.black45, child: const Icon(Icons.edit, color: Colors.white, size: 40)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(controller: nameController, enabled: isEditing, decoration: const InputDecoration(labelText: 'اسم الوجبة')),
+                    const SizedBox(height: 8),
+                    TextField(controller: descController, enabled: isEditing, decoration: const InputDecoration(labelText: 'الوصف')),
+                    const SizedBox(height: 8),
+                    TextField(controller: priceController, enabled: isEditing, decoration: const InputDecoration(labelText: 'السعر'), keyboardType: TextInputType.number),
+                  ],
+                ),
+              ),
+              actionsAlignment: MainAxisAlignment.spaceBetween,
+              actions: isEditing
+                  ? [
+                      TextButton(onPressed: () => setStateDialog(() => isEditing = false), child: const Text('إلغاء')),
+                      ElevatedButton(onPressed: handleSaveChanges, child: const Text('حفظ التعديلات')),
+                    ]
+                  : [
+                      IconButton(onPressed: handleDelete, icon: const Icon(Icons.delete, color: Colors.red)),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                           TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إغلاق')),
+                           ElevatedButton(onPressed: () => setStateDialog(() => isEditing = true), child: const Text('تعديل')),
+                        ],
+                      ),
+                    ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Consumer<MenuManagementProvider>(
-      builder: (context, menuProvider, child) {
-        MenuSection? selectedSection;
-        if (_selectedSectionId != null && menuProvider.sections.isNotEmpty) {
-          try {
-            selectedSection = menuProvider.sections.firstWhere((s) => s.id == _selectedSectionId);
-          } catch (e) {
-            _selectedSectionId = menuProvider.sections.first.id;
-            selectedSection = menuProvider.sections.first;
+    return Consumer2<AuthProvider, MenuManagementProvider>(
+      builder: (context, authProvider, menuProvider, child) {
+        
+        if (authProvider.realEstateId == null) {
+          return const _ErrorScreen(message: "لا يمكن الوصول لبيانات المطعم.");
+        }
+
+        // --- بداية الحل النهائي لخطأ setState ---
+        int? idToRender;
+        if (menuProvider.sections.isNotEmpty) {
+          final bool isCurrentIdValid = _selectedSectionId != null && menuProvider.sections.any((s) => s.id == _selectedSectionId);
+          
+          if (isCurrentIdValid) {
+            idToRender = _selectedSectionId;
+          } else {
+            idToRender = menuProvider.sections.first.id;
+            
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                setState(() {
+                  _selectedSectionId = idToRender;
+                });
+              }
+            });
           }
+        }
+        // --- نهاية الحل النهائي ---
+
+        MenuSection? selectedSection;
+        if (idToRender != null) {
+           try {
+              selectedSection = menuProvider.sections.firstWhere((s) => s.id == idToRender);
+           } catch (e) {
+             selectedSection = null;
+           }
         }
         final filteredMeals = selectedSection?.items ?? [];
 
@@ -230,18 +366,20 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
           textDirection: TextDirection.rtl,
           child: Scaffold(
             appBar: AppBar(
-              title: Text("إدارة القائمة"),
+              title: const Text("إدارة القائمة"),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  if (Navigator.canPop(context)) {
+                    Navigator.pop(context);
+                  } else {
+                    context.go('/restaurant-home');
+                  }
+                },
+              ),
               actions: [
-                IconButton(
-                  onPressed: () => _showAddCategoryDialog(context),
-                  icon: Icon(Icons.add_box_outlined, color: Colors.orange),
-                  tooltip: 'إضافة قسم',
-                ),
-                IconButton(
-                  onPressed: () => _showManageCategoriesDialog(context, menuProvider.sections),
-                  icon: Icon(Icons.list_alt, color: Colors.orange),
-                  tooltip: 'إدارة الأقسام',
-                ),
+                IconButton(onPressed: () => _showAddCategoryDialog(context), icon: const Icon(Icons.add_box_outlined, color: Colors.orange)),
+                IconButton(onPressed: () => _showManageCategoriesDialog(context, menuProvider.sections), icon: const Icon(Icons.list_alt, color: Colors.orange)),
               ],
             ),
             body: menuProvider.isLoading && menuProvider.sections.isEmpty
@@ -257,7 +395,7 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
                             itemCount: menuProvider.sections.length,
                             itemBuilder: (context, index) {
                               final section = menuProvider.sections[index];
-                              final isSelected = section.id == _selectedSectionId;
+                              final isSelected = section.id == idToRender;
                               return GestureDetector(
                                 onTap: () => setState(() => _selectedSectionId = section.id),
                                 child: Container(
@@ -266,7 +404,7 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
                                   decoration: BoxDecoration(
                                     color: isSelected ? Colors.orange : Colors.white,
                                     borderRadius: BorderRadius.circular(20),
-                                    boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4, spreadRadius: 1)],
+                                    boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4, spreadRadius: 1)],
                                   ),
                                   child: Center(child: Text(section.title, style: TextStyle(color: isSelected ? Colors.white : Colors.black, fontWeight: FontWeight.bold))),
                                 ),
@@ -281,7 +419,7 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
                                   menuProvider.sections.isEmpty
                                   ? 'قم بإضافة قسم جديد للبدء'
                                   : 'لا توجد وجبات في هذا القسم',
-                                  style: TextStyle(color: Colors.grey, fontSize: 16),
+                                  style: const TextStyle(color: Colors.grey, fontSize: 16),
                                 ),
                               )
                             : ListView.builder(
@@ -289,7 +427,7 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
                                 itemCount: filteredMeals.length,
                                 itemBuilder: (context, idx) {
                                   final meal = filteredMeals[idx];
-                                  return _buildMealCard(meal);
+                                  return _buildMealCard(meal, idToRender!);
                                 },
                               ),
                       ),
@@ -301,13 +439,14 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
               icon: const Icon(Icons.add),
               backgroundColor: Colors.orange,
             ),
+            bottomNavigationBar: _buildBottomNavigationBar(context),
           ),
         );
       },
     );
   }
 
-  Widget _buildMealCard(MenuItem meal) {
+  Widget _buildMealCard(MenuItem meal, int sectionId) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -329,9 +468,142 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
         subtitle: Text(meal.description, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
         trailing: Text("${meal.price.toStringAsFixed(0)} ج.م", style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 15)),
         onTap: () {
-          // TODO: Implement meal details/edit dialog
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تفاصيل الوجبة: ${meal.name}')));
+          _showMealDetailsDialog(context, meal, sectionId);
         },
+      ),
+    );
+  }
+
+  Widget _buildBottomNavigationBar(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 8,
+            offset: Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isTablet = constraints.maxWidth > 600;
+              
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildNavItem(
+                    context,
+                    icon: 'assets/icons/home_icon_provider.svg',
+                    label: 'الرئيسية',
+                    isSelected: false,
+                    onTap: () => context.go('/restaurant-home'),
+                    isTablet: isTablet,
+                  ),
+                  _buildNavItem(
+                    context,
+                    icon: 'assets/icons/Nav_Menu_provider.svg',
+                    label: 'القائمة',
+                    isSelected: true,
+                    onTap: () {},
+                    isTablet: isTablet,
+                  ),
+                  _buildNavItem(
+                    context,
+                    icon: 'assets/icons/Nav_Analysis_provider.svg',
+                    label: 'الإحصائيات',
+                    isSelected: false,
+                    onTap: () => context.go('/RestaurantAnalysisScreen'),
+                    isTablet: isTablet,
+                  ),
+                  _buildNavItem(
+                    context,
+                    icon: 'assets/icons/Settings.svg',
+                    label: 'الإعدادات',
+                    isSelected: false,
+                    onTap: () => context.go('/SettingsProvider'),
+                    isTablet: isTablet,
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(
+    BuildContext context, {
+    required String icon,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required bool isTablet,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: isTablet ? 20 : 12,
+          vertical: isTablet ? 12 : 8,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.orange.withOpacity(0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SvgPicture.asset(
+              icon,
+              width: isTablet ? 28 : 24,
+              height: isTablet ? 28 : 24,
+              colorFilter: ColorFilter.mode(
+                isSelected ? Colors.orange : Colors.grey[600]!,
+                BlendMode.srcIn,
+              ),
+            ),
+            SizedBox(height: isTablet ? 6 : 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: isTablet ? 14 : 12,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                color: isSelected ? Colors.orange : Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorScreen extends StatelessWidget {
+  final String message;
+  const _ErrorScreen({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(title: const Text("خطأ")),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 16, color: Colors.red),
+            ),
+          ),
+        ),
       ),
     );
   }

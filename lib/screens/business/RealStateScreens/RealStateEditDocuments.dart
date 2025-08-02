@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import '../../../services/real_estate_service.dart';
 
 class RealStateEditDocuments extends StatefulWidget {
   const RealStateEditDocuments({super.key});
@@ -10,29 +12,201 @@ class RealStateEditDocuments extends StatefulWidget {
 
 class _RealStateEditDocumentsState extends State<RealStateEditDocuments> {
   bool isEditMode = false;
-
-  // بيانات وهمية placeholder (تبدلها ببياناتك عند الربط مع backend)
-  Map<String, String?> docs = {
-    'ownerIdFront': null,
-    'ownerIdBack': null,
-    'restaurantLicenseFront': null,
-    'restaurantLicenseBack': null,
-    'crPhotoFront': null,
-    'crPhotoBack': null,
-    'vatPhotoFront': null,
-    'vatPhotoBack': null,
-  };
+  bool _isLoading = false;
+  bool _isDataLoading = true;
+  
+  final RealEstateService _realEstateService = RealEstateService();
+  Map<String, dynamic>? _userData;
+  String? _userType;
+  
+  // بيانات المستندات
+  Map<String, String?> docs = {};
   bool includesVat = true;
+  
+  final ImagePicker _picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    try {
+      setState(() => _isDataLoading = true);
+      
+      _userData = await _realEstateService.getCurrentUserData();
+      
+      if (_userData != null) {
+        _userType = _userData!['user_type'];
+        
+        // تحديد البيانات حسب نوع المستخدم
+        if (_userType == 'real_estate_office' && _userData!['real_estate']?['office_detail'] != null) {
+          final officeDetail = _userData!['real_estate']['office_detail'];
+          docs = {
+            'ownerIdFront': officeDetail['owner_id_front_image'],
+            'ownerIdBack': officeDetail['owner_id_back_image'],
+            'officeImage': officeDetail['office_image'],
+            'logoImage': officeDetail['logo_image'],
+            'crPhotoFront': officeDetail['commercial_register_front_image'],
+            'crPhotoBack': officeDetail['commercial_register_back_image'],
+          };
+          includesVat = officeDetail['tax_enabled'] == 1;
+        } else if (_userType == 'real_estate_individual' && _userData!['real_estate']?['individual_detail'] != null) {
+          final individualDetail = _userData!['real_estate']['individual_detail'];
+          docs = {
+            'profileImage': individualDetail['profile_image'],
+            'agentIdFront': individualDetail['agent_id_front_image'],
+            'agentIdBack': individualDetail['agent_id_back_image'],
+            'taxCardFront': individualDetail['tax_card_front_image'],
+            'taxCardBack': individualDetail['tax_card_back_image'],
+          };
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading user data: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في تحميل البيانات: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _isDataLoading = false);
+    }
+  }
+
+  Future<void> _pickImage(String key) async {
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      if (image != null) {
+        setState(() => _isLoading = true);
+        
+        String? imageUrl = await _realEstateService.uploadImage(image.path);
+        
+        if (imageUrl != null) {
+          setState(() {
+            docs[key] = imageUrl;
+          });
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تم رفع الصورة بنجاح'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          throw Exception('فشل في رفع الصورة');
+        }
+      }
+    } catch (e) {
+      debugPrint('Error uploading image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في رفع الصورة: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _saveDocuments() async {
+    try {
+      setState(() => _isLoading = true);
+      
+      bool success = false;
+      
+      if (_userType == 'real_estate_office') {
+        success = await _realEstateService.updateOfficeDocuments(
+          ownerIdFrontImage: docs['ownerIdFront'],
+          ownerIdBackImage: docs['ownerIdBack'],
+          officeImage: docs['officeImage'],
+          logoImage: docs['logoImage'],
+          commercialRegisterFrontImage: docs['crPhotoFront'],
+          commercialRegisterBackImage: docs['crPhotoBack'],
+          taxEnabled: includesVat,
+        );
+      } else if (_userType == 'real_estate_individual') {
+        success = await _realEstateService.updateIndividualDocuments(
+          profileImage: docs['profileImage'],
+          agentIdFrontImage: docs['agentIdFront'],
+          agentIdBackImage: docs['agentIdBack'],
+          taxCardFrontImage: docs['taxCardFront'],
+          taxCardBackImage: docs['taxCardBack'],
+        );
+      }
+
+      if (success) {
+        setState(() => isEditMode = false);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم حفظ المستندات بنجاح'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        throw Exception('فشل في حفظ المستندات');
+      }
+    } catch (e) {
+      debugPrint('Error saving documents: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في حفظ المستندات: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
+    if (_isDataLoading) {
+      return Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          backgroundColor: const Color(0XFFF5F5F5),
+          appBar: AppBar(
+            title: Text(
+              _userType == 'real_estate_office' ? 'مستندات المكتب' : 'مستندات السمسار',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.black,
+            elevation: 1,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios, color: Colors.orange),
+              onPressed: () => context.go("/RealStateEditProfile"),
+            ),
+          ),
+          body: const Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: const Color(0XFFF5F5F5),
         appBar: AppBar(
-          title: const Text('مستندات المكتب', style: TextStyle(fontWeight: FontWeight.bold)),
+          title: Text(
+            _userType == 'real_estate_office' ? 'مستندات المكتب' : 'مستندات السمسار',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
           elevation: 1,
@@ -41,16 +215,30 @@ class _RealStateEditDocumentsState extends State<RealStateEditDocuments> {
             onPressed: () => context.go("/RealStateEditProfile"),
           ),
           actions: [
-            IconButton(
-              icon: Icon(isEditMode ? Icons.save : Icons.edit, color: Colors.orange),
-              tooltip: isEditMode ? 'حفظ' : 'تعديل',
-              onPressed: () {
-                setState(() {
-                  // لو في وضع التعديل وخلصت: ممكن هنا تضيف كود الحفظ الفعلي
-                  isEditMode = !isEditMode;
-                });
-              },
-            ),
+            if (_isLoading)
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+                  ),
+                ),
+              )
+            else
+              IconButton(
+                icon: Icon(isEditMode ? Icons.save : Icons.edit, color: Colors.orange),
+                tooltip: isEditMode ? 'حفظ' : 'تعديل',
+                onPressed: () {
+                  if (isEditMode) {
+                    _saveDocuments();
+                  } else {
+                    setState(() => isEditMode = true);
+                  }
+                },
+              ),
           ],
         ),
         body: Padding(
@@ -63,36 +251,7 @@ class _RealStateEditDocumentsState extends State<RealStateEditDocuments> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _SectionTitle(title: 'صور هوية المالك'),
-                  const SizedBox(height: 12),
-                  _buildImageRow('صورة أمامية', 'ownerIdFront'),
-                  const SizedBox(height: 12),
-                  _buildImageRow('صورة خلفية', 'ownerIdBack'),
-                  const SizedBox(height: 24),
-                  _SectionTitle(title: 'صور رخصة المطعم'),
-                  const SizedBox(height: 12),
-                  _buildImageRow('صورة أمامية', 'restaurantLicenseFront'),
-                  const SizedBox(height: 12),
-                  _buildImageRow('صورة خلفية', 'restaurantLicenseBack'),
-                  const SizedBox(height: 24),
-                  _SectionTitle(title: 'صور السجل التجاري'),
-                  const SizedBox(height: 12),
-                  _buildImageRow('صورة أمامية', 'crPhotoFront'),
-                  const SizedBox(height: 12),
-                  _buildImageRow('صورة خلفية', 'crPhotoBack'),
-                  const SizedBox(height: 24),
-                  _SectionTitle(title: 'ضريبة القيمة المضافة'),
-                  const SizedBox(height: 12),
-                  _buildVatRow(context),
-                  const SizedBox(height: 24),
-                  _SectionTitle(title: 'صور ضريبة القيمة المضافة'),
-                  const SizedBox(height: 12),
-                  _buildImageRow('صورة أمامية', 'vatPhotoFront'),
-                  const SizedBox(height: 12),
-                  _buildImageRow('صورة خلفية', 'vatPhotoBack'),
-                  const SizedBox(height: 15),
-                ],
+                children: _buildDocumentSections(),
               ),
             ),
           ),
@@ -101,8 +260,66 @@ class _RealStateEditDocumentsState extends State<RealStateEditDocuments> {
     );
   }
 
+  List<Widget> _buildDocumentSections() {
+    List<Widget> sections = [];
+
+    if (_userType == 'real_estate_office') {
+      // مستندات المكتب العقاري
+      sections.addAll([
+        const _SectionTitle(title: 'صور هوية المالك'),
+        const SizedBox(height: 12),
+        _buildImageRow('صورة أمامية', 'ownerIdFront'),
+        const SizedBox(height: 12),
+        _buildImageRow('صورة خلفية', 'ownerIdBack'),
+        const SizedBox(height: 24),
+        
+        const _SectionTitle(title: 'صور المكتب'),
+        const SizedBox(height: 12),
+        _buildImageRow('صورة المكتب', 'officeImage'),
+        const SizedBox(height: 12),
+        _buildImageRow('شعار المكتب', 'logoImage'),
+        const SizedBox(height: 24),
+        
+        const _SectionTitle(title: 'صور السجل التجاري'),
+        const SizedBox(height: 12),
+        _buildImageRow('صورة أمامية', 'crPhotoFront'),
+        const SizedBox(height: 12),
+        _buildImageRow('صورة خلفية', 'crPhotoBack'),
+        const SizedBox(height: 24),
+        
+        const _SectionTitle(title: 'ضريبة القيمة المضافة'),
+        const SizedBox(height: 12),
+        _buildVatRow(context),
+        const SizedBox(height: 15),
+      ]);
+    } else if (_userType == 'real_estate_individual') {
+      // مستندات السمسار الفردي
+      sections.addAll([
+        const _SectionTitle(title: 'الصورة الشخصية'),
+        const SizedBox(height: 12),
+        _buildImageRow('الصورة الشخصية', 'profileImage'),
+        const SizedBox(height: 24),
+        
+        const _SectionTitle(title: 'صور الهوية'),
+        const SizedBox(height: 12),
+        _buildImageRow('صورة أمامية', 'agentIdFront'),
+        const SizedBox(height: 12),
+        _buildImageRow('صورة خلفية', 'agentIdBack'),
+        const SizedBox(height: 24),
+        
+        const _SectionTitle(title: 'صور البطاقة الضريبية'),
+        const SizedBox(height: 12),
+        _buildImageRow('صورة أمامية', 'taxCardFront'),
+        const SizedBox(height: 12),
+        _buildImageRow('صورة خلفية', 'taxCardBack'),
+        const SizedBox(height: 15),
+      ]);
+    }
+
+    return sections;
+  }
+
   Widget _buildImageRow(String label, String key) {
-    final placeholderImage = 'https://via.placeholder.com/110x80.png?text=Image';
     final imagePath = docs[key];
     return Row(
       children: [
@@ -113,16 +330,21 @@ class _RealStateEditDocumentsState extends State<RealStateEditDocuments> {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.grey.shade300),
             color: Colors.grey[100],
-            image: imagePath != null
+            image: imagePath != null && imagePath.isNotEmpty
                 ? DecorationImage(
-                image: NetworkImage(imagePath), fit: BoxFit.cover)
+                    image: NetworkImage(imagePath), 
+                    fit: BoxFit.cover,
+                    onError: (exception, stackTrace) {
+                      debugPrint('Error loading image: $exception');
+                    },
+                  )
                 : null,
           ),
-          child: imagePath == null
+          child: imagePath == null || imagePath.isEmpty
               ? Center(
-            child: Icon(Icons.image_outlined,
-                color: Colors.orange.shade200, size: 40),
-          )
+                  child: Icon(Icons.image_outlined,
+                      color: Colors.orange.shade200, size: 40),
+                )
               : null,
         ),
         const SizedBox(width: 14),
@@ -134,21 +356,32 @@ class _RealStateEditDocumentsState extends State<RealStateEditDocuments> {
         ),
         if (isEditMode)
           TextButton.icon(
-            icon: const Icon(Icons.upload_file, color: Colors.orange),
-            label: const Text('رفع/تغيير',
-                style: TextStyle(color: Colors.orange)),
-            onPressed: () {
-              // هنا هتضيف كود رفع الصورة الفعلي لاحقاً
-              setState(() {
-                docs[key] = placeholderImage; // بس عشان توضيح التجربة
-              });
-            },
+            icon: _isLoading 
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+                    ),
+                  )
+                : const Icon(Icons.upload_file, color: Colors.orange),
+            label: Text(
+              imagePath != null && imagePath.isNotEmpty ? 'تغيير' : 'رفع',
+              style: const TextStyle(color: Colors.orange),
+            ),
+            onPressed: _isLoading ? null : () => _pickImage(key),
           ),
       ],
     );
   }
 
   Widget _buildVatRow(BuildContext context) {
+    // ضريبة القيمة المضافة تظهر فقط للمكتب العقاري
+    if (_userType != 'real_estate_office') {
+      return const SizedBox.shrink();
+    }
+
     if (!isEditMode) {
       return Row(
         children: [

@@ -6,7 +6,8 @@ class CarRentalSettingsProvider extends StatefulWidget {
   const CarRentalSettingsProvider({super.key});
 
   @override
-  State<CarRentalSettingsProvider> createState() => _CarRentalSettingsProviderState();
+  State<CarRentalSettingsProvider> createState() =>
+      _CarRentalSettingsProviderState();
 }
 
 class _CarRentalSettingsProviderState extends State<CarRentalSettingsProvider> {
@@ -43,7 +44,8 @@ class _CarRentalSettingsProviderState extends State<CarRentalSettingsProvider> {
       ),
       _SettingsItem(
         label: "اللغة",
-        svgPath: "assets/icons/language.svg", // يمكنك استخدام أيقونة اللغة أو أي أيقونة مناسبة
+        svgPath:
+            "assets/icons/language.svg", // يمكنك استخدام أيقونة اللغة أو أي أيقونة مناسبة
         customWidget: _buildLanguageToggle(orangeColor),
         router: '',
       ),
@@ -99,7 +101,9 @@ class _CarRentalSettingsProviderState extends State<CarRentalSettingsProvider> {
                 child: Padding(
                   padding: EdgeInsets.symmetric(
                     vertical: 20,
-                    horizontal: constraints.maxWidth > 600 ? constraints.maxWidth * 0.2 : 16,
+                    horizontal: constraints.maxWidth > 600
+                        ? constraints.maxWidth * 0.2
+                        : 16,
                   ),
                   child: Column(
                     children: [
@@ -109,14 +113,16 @@ class _CarRentalSettingsProviderState extends State<CarRentalSettingsProvider> {
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: ListView.separated(
-                          separatorBuilder: (c, i) => const Divider(height: 0, color: Color(0xFFF1F1F1)),
+                          separatorBuilder: (c, i) => const Divider(
+                              height: 0, color: Color(0xFFF1F1F1)),
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           itemCount: items.length,
                           itemBuilder: (context, index) {
                             final item = items[index];
                             return ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 2),
                               leading: SvgPicture.asset(
                                 item.svgPath,
                                 width: 24,
@@ -125,11 +131,13 @@ class _CarRentalSettingsProviderState extends State<CarRentalSettingsProvider> {
                               ),
                               title: Text(
                                 item.label,
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                                style: const TextStyle(
+                                    fontSize: 16, fontWeight: FontWeight.w500),
                               ),
                               trailing: item.customWidget ??
                                   (item.trailing != null
-                                      ? Icon(Icons.arrow_forward_ios_rounded, color: orangeColor)
+                                      ? Icon(Icons.arrow_forward_ios_rounded,
+                                          color: orangeColor)
                                       : null),
                               onTap: (item.router.isNotEmpty)
                                   ? () => context.push(item.router)
@@ -142,19 +150,25 @@ class _CarRentalSettingsProviderState extends State<CarRentalSettingsProvider> {
                       const SizedBox(height: 32),
                       const Text(
                         "تابعونا على",
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 15),
                       ),
                       const SizedBox(height: 12),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          _SocialIcon(svgPath: "assets/icons/telephone_901122.svg"),
+                          _SocialIcon(
+                              svgPath: "assets/icons/telephone_901122.svg"),
                           const SizedBox(width: 16),
-                          _SocialIcon(svgPath: "assets/icons/youtube_246153.svg"),
+                          _SocialIcon(
+                              svgPath: "assets/icons/youtube_246153.svg"),
                           const SizedBox(width: 16),
-                          _SocialIcon(svgPath: "assets/icons/twitter_2335289.svg"),
+                          _SocialIcon(
+                              svgPath: "assets/icons/twitter_2335289.svg"),
                           const SizedBox(width: 16),
-                          _SocialIcon(svgPath: "assets/icons/facebook-logo_1384879.svg"),
+                          _SocialIcon(
+                              svgPath:
+                                  "assets/icons/facebook-logo_1384879.svg"),
                         ],
                       ),
                       const SizedBox(height: 36),
@@ -163,10 +177,14 @@ class _CarRentalSettingsProviderState extends State<CarRentalSettingsProvider> {
                         width: double.infinity,
                         child: ElevatedButton.icon(
                           onPressed: () => context.go("/login"),
-                          icon: const Icon(Icons.logout, color: Colors.white, size: 20),
+                          icon: const Icon(Icons.logout,
+                              color: Colors.white, size: 20),
                           label: const Text(
                             "تسجيل الخروج",
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Colors.white),
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.orange,
@@ -248,17 +266,20 @@ class _CarRentalSettingsProviderState extends State<CarRentalSettingsProvider> {
   }
 
   Widget _buildBottomNavigationBar(BuildContext context, bool isTablet) {
-    int currentIndex = 2; // القائمة
-
+    int currentIndex = 3;
     void onItemTapped(int index) {
+      if (index == currentIndex) return;
       switch (index) {
         case 0:
           context.go('/delivery-homescreen');
           break;
         case 1:
-          context.go('/CarRentalAnalysisScreen');
+          context.go('/AddCarRental');
           break;
         case 2:
+          context.go('/CarRentalAnalysisScreen');
+          break;
+        case 3:
           context.go('/CarRentalSettingsProvider');
           break;
       }
@@ -266,6 +287,7 @@ class _CarRentalSettingsProviderState extends State<CarRentalSettingsProvider> {
 
     final List<Map<String, String>> navIcons = [
       {"svg": "assets/icons/home_icon_provider.svg", "label": "الرئيسية"},
+      {"svg": "assets/icons/Nav_Menu_provider.svg", "label": "إضافة سيارة"},
       {"svg": "assets/icons/Nav_Analysis_provider.svg", "label": "الإحصائيات"},
       {"svg": "assets/icons/Settings.svg", "label": "الإعدادات"},
     ];
@@ -273,61 +295,43 @@ class _CarRentalSettingsProviderState extends State<CarRentalSettingsProvider> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
+        decoration: BoxDecoration(color: Colors.white, boxShadow: [
+          BoxShadow(
               color: Colors.black.withOpacity(0.08),
               blurRadius: 12,
-              offset: const Offset(0, -4),
-            ),
-          ],
-        ),
+              offset: const Offset(0, -4))
+        ]),
         child: SafeArea(
           child: Padding(
             padding: EdgeInsets.symmetric(
-              vertical: isTablet ? 16 : 5,
-              horizontal: isTablet ? 20 : 8,
-            ),
+                vertical: isTablet ? 12 : 8, horizontal: isTablet ? 20 : 8),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: List.generate(navIcons.length, (idx) {
                 final item = navIcons[idx];
                 final selected = idx == currentIndex;
-                Color mainColor = selected ? Colors.orange : const Color(0xFF6B7280);
-
-                return InkWell(
-                  onTap: () => onItemTapped(idx),
-                  borderRadius: BorderRadius.circular(16),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isTablet ? 20 : 16,
-                      vertical: isTablet ? 12 : 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: selected ? Colors.orange.withOpacity(0.1) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SvgPicture.asset(
-                          item["svg"]!,
-                          height: isTablet ? 28 : 24,
-                          width: isTablet ? 28 : 24,
-                          colorFilter: ColorFilter.mode(mainColor, BlendMode.srcIn),
-                        ),
-                        SizedBox(height: isTablet ? 8 : 6),
-                        Text(
-                          item["label"]!,
-                          style: TextStyle(
-                            fontSize: isTablet ? 14 : 12,
-                            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                            color: mainColor,
-                          ),
-                        ),
-                      ],
+                Color mainColor =
+                    selected ? Colors.orange : const Color(0xFF6B7280);
+                return Expanded(
+                  child: InkWell(
+                    onTap: () => onItemTapped(idx),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4.0),
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        SvgPicture.asset(item["svg"]!,
+                            height: isTablet ? 26 : 22,
+                            colorFilter:
+                                ColorFilter.mode(mainColor, BlendMode.srcIn)),
+                        const SizedBox(height: 5),
+                        Text(item["label"]!,
+                            style: TextStyle(
+                                fontSize: isTablet ? 13 : 11,
+                                fontWeight: selected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                                color: mainColor)),
+                      ]),
                     ),
                   ),
                 );

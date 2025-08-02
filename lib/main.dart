@@ -4,11 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart'; // <<<--- الخطوة 1: تم إضافة هذا السطر
 import 'package:saba2v2/providers/menu_management_provider.dart';
+import 'package:saba2v2/providers/order_provider.dart';
+import 'package:saba2v2/providers/restaurant_order_provider.dart';
 import 'package:saba2v2/router/app_router.dart';
 import 'package:saba2v2/providers/service_category_provider.dart';
 import 'package:saba2v2/providers/restaurant_provider.dart';
 import 'package:saba2v2/providers/real_estate_provider.dart';
 import 'package:saba2v2/providers/auth_provider.dart';
+import 'package:saba2v2/providers/conversation_provider.dart';
+import 'package:saba2v2/providers/restaurant_profile_provider.dart';
 
 void main() async {
   // التأكد من تهيئة Flutter bindings
@@ -29,6 +33,10 @@ void main() async {
         //ChangeNotifierProvider(create: (_) => RestaurantProvider()),
         ChangeNotifierProvider(create: (_) => RealEstateProvider()),
         ChangeNotifierProvider(create: (ctx) => MenuManagementProvider()),
+        ChangeNotifierProvider(create: (_) => OrderProvider()),
+        ChangeNotifierProvider(create: (_) => RestaurantOrderProvider()),
+        ChangeNotifierProvider(create: (_) => ConversationProvider()),
+        ChangeNotifierProvider(create: (_) => RestaurantProfileProvider()),
       ],
       child: MaterialApp.router(
         title: 'تطبيق مسار',

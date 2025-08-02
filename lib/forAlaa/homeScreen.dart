@@ -1,149 +1,52 @@
-import 'package:flutter/material.dart';
+// lib/services/car_rental_office_service.dart
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+import '../models/service_request_model.dart';
 
-class AlaaHome extends StatelessWidget {
-  const AlaaHome({super.key});
+class CarRentalOfficeService {
+  final String _apiBaseUrl = "http://192.168.1.7:8000/api/provider/service-requests";
+  final String token;
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              // الصف الأول
-              _buildCategoryRow(context, [
-                _CategoryItem(
-                  title: 'Cars Sales',
-                  color: const Color(0xFF1B5E7E),
-                  textColor: Colors.white,
-                ),
-                _CategoryItem(
-                  title: 'Real Estate',
-                  color: const Color(0xFFE8F4F8),
-                  textColor: const Color(0xFF1B5E7E),
-                ),
-                _CategoryItem(
-                  title: 'Electronics & Home\nAppliances',
-                  color: const Color(0xFFE8F4F8),
-                  textColor: const Color(0xFF1B5E7E),
-                ),
-                _CategoryItem(
-                  title: 'Jobs',
-                  color: const Color(0xFFE8F4F8),
-                  textColor: const Color(0xFF1B5E7E),
-                ),
-              ]),
+  CarRentalOfficeService({required this.token});
 
-              const SizedBox(height: 12),
+  /// Fetches ALL available service requests for the logged-in provider.
+  /// The backend automatically filters by provider type (office/driver).
+  Future<List<ServiceRequest>> getAvailableRequests() async {
+    final url = Uri.parse(_apiBaseUrl); 
+    try {
+      final response = await http.get(url, headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      });
 
-              // الصف الثاني
-              _buildCategoryRow(context, [
-                _CategoryItem(
-                  title: 'Cars Rent',
-                  color: const Color(0xFFE8F4F8),
-                  textColor: const Color(0xFF1B5E7E),
-                ),
-                _CategoryItem(
-                  title: 'Cars Services',
-                  color: const Color(0xFFE8F4F8),
-                  textColor: const Color(0xFF1B5E7E),
-                ),
-                _CategoryItem(
-                  title: 'Restaurants',
-                  color: const Color(0xFFE8F4F8),
-                  textColor: const Color(0xFF1B5E7E),
-                ),
-                _CategoryItem(
-                  title: 'Other Services',
-                  color: const Color(0xFFE8F4F8),
-                  textColor: const Color(0xFF1B5E7E),
-                ),
-              ]),
-            ],
-          ),
-        ),
-      ),
-    );
+      if (response.statusCode == 200) {
+        final decodedBody = jsonDecode(response.body);
+        
+        if (decodedBody['status'] == true && decodedBody['requests'] != null) {
+          final List<dynamic> requestsList = decodedBody['requests'];
+          return requestsList.map((json) => ServiceRequest.fromJson(json)).toList();
+        } else {
+          // Handle cases where 'status' is false or 'requests' key is missing
+          return [];
+        }
+      } else {
+        // Handle HTTP errors like 401, 500 etc.
+        debugPrint("API Error (getAvailableRequests): Status ${response.statusCode}, Body: ${response.body}");
+        throw Exception('Failed to fetch requests.');
+      }
+    } catch (e) {
+      debugPrint("Exception in getAvailableRequests: $e");
+      rethrow; // Rethrow to be handled by the provider
+    }
   }
 
-  Widget _buildCategoryRow(BuildContext context, List<_CategoryItem> items) {
-    return Row(
-      children: items.asMap().entries.map((entry) {
-        int index = entry.key;
-        _CategoryItem item = entry.value;
-
-        // العنصر الثالث في الصف الأول (Electronics & Home Appliances) يكون أعرض
-        int flex = (index == 2 && item.title.contains('Electronics')) ? 2 : 1;
-
-        return Expanded(
-          flex: flex,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4.0),
-            child: _buildCategoryCard(context, item),
-          ),
-        );
-      }).toList(),
-    );
+  // Action methods (accept, complete) can remain the same.
+  Future<void> acceptServiceRequest({required int requestId}) async {
+    // ... POST action logic
   }
 
-  Widget _buildCategoryCard(BuildContext context, _CategoryItem item) {
-    // حساب عرض الشاشة للتجاوب
-    double screenWidth = MediaQuery.of(context).size.width;
-
-    // حساب حجم الخط بناءً على عرض الشاشة
-    double fontSize = screenWidth > 600 ? 14 :
-    screenWidth > 400 ? 12 : 10;
-
-    return GestureDetector(
-      onTap: () {
-        // يمكنك إضافة الوظائف هنا
-        print('Tapped on: ${item.title}');
-      },
-      child: Container(
-        height: 40, // ارتفاع ثابت كما في التصميم
-        decoration: BoxDecoration(
-          color: item.color,
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 2,
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2.0),
-            child: Text(
-              item.title,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: item.textColor,
-                fontSize: fontSize,
-                fontWeight: FontWeight.w600,
-                height: 1.2,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ),
-      ),
-    );
+  Future<void> completeServiceRequest({required int requestId}) async {
+    // ... POST action logic
   }
-}
-
-class _CategoryItem {
-  final String title;
-  final Color color;
-  final Color textColor;
-
-  _CategoryItem({
-    required this.title,
-    required this.color,
-    required this.textColor,
-  });
 }

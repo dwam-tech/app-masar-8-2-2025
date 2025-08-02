@@ -593,26 +593,21 @@ class _CarRentalAnalysisScreenState extends State<CarRentalAnalysisScreen> {
     );
   }
 
-  Widget _buildBottomNavigationBar(BuildContext context, bool isTablet) {
-    int currentIndex = 1; // القائمة
-
+   Widget _buildBottomNavigationBar(BuildContext context, bool isTablet) {
+    int currentIndex = 2;
     void onItemTapped(int index) {
+      if (index == currentIndex) return;
       switch (index) {
-        case 0:
-          context.go('/delivery-homescreen');
-          break;
-        case 1:
-          context.go('/CarRentalAnalysisScreen');
-          break;
-        case 2:
-          context.go('/CarRentalSettingsProvider');
-          break;
-
+        case 0: context.go('/delivery-homescreen'); break;
+        case 1: context.go('/AddCarRental'); break;
+        case 2: context.go('/CarRentalAnalysisScreen'); break;
+        case 3: context.go('/CarRentalSettingsProvider'); break;
       }
     }
 
     final List<Map<String, String>> navIcons = [
       {"svg": "assets/icons/home_icon_provider.svg", "label": "الرئيسية"},
+      {"svg": "assets/icons/Nav_Menu_provider.svg", "label": "إضافة سيارة"},
       {"svg": "assets/icons/Nav_Analysis_provider.svg", "label": "الإحصائيات"},
       {"svg": "assets/icons/Settings.svg", "label": "الإعدادات"},
     ];
@@ -620,67 +615,27 @@ class _CarRentalAnalysisScreenState extends State<CarRentalAnalysisScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 12,
-              offset: const Offset(0, -4),
-            ),
-          ],
-        ),
+        decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, -4))]),
         child: SafeArea(
           child: Padding(
-            padding: EdgeInsets.symmetric(
-              vertical: isTablet ? 16 : 5,
-              horizontal: isTablet ? 20 : 8,
-            ),
+            padding: EdgeInsets.symmetric(vertical: isTablet ? 12 : 8, horizontal: isTablet ? 20 : 8),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: List.generate(navIcons.length, (idx) {
                 final item = navIcons[idx];
                 final selected = idx == currentIndex;
-                Color mainColor =
-                selected ? Colors.orange : const Color(0xFF6B7280);
-
-                return InkWell(
-                  onTap: () => onItemTapped(idx),
-                  borderRadius: BorderRadius.circular(16),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isTablet ? 20 : 16,
-                      vertical: isTablet ? 12 : 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? Colors.orange.withOpacity(0.1)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SvgPicture.asset(
-                          item["svg"]!,
-                          height: isTablet ? 28 : 24,
-                          width: isTablet ? 28 : 24,
-                          colorFilter:
-                          ColorFilter.mode(mainColor, BlendMode.srcIn),
-                        ),
-                        SizedBox(height: isTablet ? 8 : 6),
-                        Text(
-                          item["label"]!,
-                          style: TextStyle(
-                            fontSize: isTablet ? 14 : 12,
-                            fontWeight: selected
-                                ? FontWeight.w700
-                                : FontWeight.w500,
-                            color: mainColor,
-                          ),
-                        ),
-                      ],
+                Color mainColor = selected ? Colors.orange : const Color(0xFF6B7280);
+                return Expanded(
+                  child: InkWell(
+                    onTap: () => onItemTapped(idx),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4.0),
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        SvgPicture.asset(item["svg"]!, height: isTablet ? 26 : 22, colorFilter: ColorFilter.mode(mainColor, BlendMode.srcIn)),
+                        const SizedBox(height: 5),
+                        Text(item["label"]!, style: TextStyle(fontSize: isTablet ? 13 : 11, fontWeight: selected ? FontWeight.bold : FontWeight.normal, color: mainColor)),
+                      ]),
                     ),
                   ),
                 );

@@ -15,6 +15,7 @@ import 'package:saba2v2/widgets/service_card.dart';
 import 'package:saba2v2/widgets/restaurant_card.dart';
 import 'package:saba2v2/widgets/restaurant_slider_card.dart';
 import 'package:saba2v2/widgets/real_estate_card.dart';
+import 'package:saba2v2/screens/conversations_list_screen.dart';
 
 class UserHomeScreen extends StatefulWidget {
   const UserHomeScreen({super.key});
@@ -483,7 +484,11 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
           icon: Icons.message_outlined,
           badge: "5",
           onTap: () {
-            // Navigate to messages
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const ConversationsListScreen(),
+              ),
+            );
           },
           isTablet: isTablet,
         ),

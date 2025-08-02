@@ -59,7 +59,7 @@ class _DeliveryOfficeInformationState extends State<DeliveryOfficeInformation> {
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
 
-  static const String _baseUrl = 'http://192.168.1.8:8000'; // استبدلي هذا بالـ URL الفعلي
+  static const String _baseUrl = 'http://192.168.1.7:8000'; // استبدلي هذا بالـ URL الفعلي
 
   @override
   void dispose() {

@@ -5,46 +5,332 @@ import 'package:intl/intl.dart' as intl;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
+import 'package:saba2v2/models/appointment_model.dart';
 import 'dart:io';
 
 import 'package:saba2v2/models/property_model.dart';
 import 'package:saba2v2/providers/auth_provider.dart';
+import 'package:saba2v2/screens/conversations_list_screen.dart';
 
-// تم الافتراض أن هذا الكلاس موجود في ملف models/property_model.dart
-// ولكن سأتركه هنا كما كان في الكود الأصلي لضمان عمله مباشرة
-// class Property {
-//   String id;
-//   String address;
-//   String type;
-//   int price;
-//   String description;
-//   String imageUrl;
-//   int bedrooms;
-//   int bathrooms;
-//   String view;
-//   String paymentMethod;
-//   String area;
-//   String submittedBy;
-//   String submittedPrice;
-//   bool isReady;
+//==============================================================================
+// START: Appointment Card Widget
+//==============================================================================
 
-//   Property({
-//     required this.id,
-//     required this.address,
-//     required this.type,
-//     required this.price,
-//     required this.description,
-//     required this.imageUrl,
-//     required this.bedrooms,
-//     required this.bathrooms,
-//     required this.view,
-//     required this.paymentMethod,
-//     required this.area,
-//     required this.submittedBy,
-//     required this.submittedPrice,
-//     this.isReady = false,
-//   });
-// }
+class AppointmentCard extends StatefulWidget {
+  final Appointment appointment;
+
+  const AppointmentCard({Key? key, required this.appointment}) : super(key: key);
+
+  @override
+  State<AppointmentCard> createState() => _AppointmentCardState();
+}
+
+class _AppointmentCardState extends State<AppointmentCard> {
+  bool _isApproving = false;
+  // يمكنك إضافة حالة تحميل لزر التغيير هنا إذا أردت
+  // bool _isChanging = false;
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'provider_approved':
+        return Colors.green;
+      case 'pending':
+        return Colors.orange;
+      case 'rejected':
+        return Colors.red;
+      case 'completed':
+        return Colors.blue;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _getStatusText(String status) {
+    switch (status) {
+      case 'provider_approved':
+        return 'تم القبول';
+      case 'pending':
+        return 'في الانتظار';
+      case 'rejected':
+        return 'مرفوض';
+      case 'completed':
+        return 'مكتمل';
+      default:
+        return 'غير محدد';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Row for Property and Customer info
+            Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: CachedNetworkImage(
+                    imageUrl: widget.appointment.property.imageUrl,
+                    width: 70,
+                    height: 70,
+                    fit: BoxFit.cover,
+                    errorWidget: (context, url, error) => Container(
+                        width: 70, height: 70, color: Colors.grey[200], child: const Icon(Icons.business)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'موعد لمعاينة: ${widget.appointment.property.type}',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'بطلب من العميل: ${widget.appointment.customer.name}',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 24),
+
+            // Appointment Datetime
+            _buildInfoRow(
+              icon: Icons.calendar_today,
+              title: 'تاريخ وتوقيت الموعد',
+              value: intl.DateFormat('EEEE, d MMMM yyyy - hh:mm a', 'ar').format(widget.appointment.appointmentDatetime),
+            ),
+            const SizedBox(height: 12),
+
+            // Customer Note
+            if (widget.appointment.note != null && widget.appointment.note!.isNotEmpty)
+              _buildInfoRow(
+                icon: Icons.notes_rounded,
+                title: 'ملاحظات العميل',
+                value: widget.appointment.note!,
+                isNote: true,
+              ),
+
+            // Admin Note
+            if (widget.appointment.adminNote != null && widget.appointment.adminNote!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 12.0),
+                child: _buildInfoRow(
+                  icon: Icons.admin_panel_settings,
+                  title: 'ملاحظات الإدارة',
+                  value: widget.appointment.adminNote!,
+                  isNote: true,
+                  iconColor: Colors.blue[700],
+                ),
+              ),
+
+            const SizedBox(height: 20),
+
+            // Status Badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: _getStatusColor(widget.appointment.status).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: _getStatusColor(widget.appointment.status),
+                  width: 1,
+                ),
+              ),
+              child: Text(
+                _getStatusText(widget.appointment.status),
+                style: TextStyle(
+                  color: _getStatusColor(widget.appointment.status),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Action Buttons - only show if appointment is not approved
+            if (widget.appointment.status != 'provider_approved')
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _isApproving ? null : () async {
+                        setState(() {
+                          _isApproving = true;
+                        });
+
+                        final provider = Provider.of<AuthProvider>(context, listen: false);
+                        final success = await provider.approveAppointment(appointmentId: widget.appointment.id);
+
+                        if (!mounted) return;
+
+                        if (success) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('تم قبول الموعد بنجاح!'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('فشل قبول الموعد، يرجى المحاولة مرة أخرى.'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          setState(() {
+                            _isApproving = false;
+                          });
+                        }
+                      },
+                      icon: _isApproving
+                          ? Container(
+                              width: 20,
+                              height: 20,
+                              child: const CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2.5,
+                              ),
+                            )
+                          : const Icon(Icons.check_circle_outline, size: 20),
+                      label: Text(_isApproving ? 'جاري القبول...' : 'قبول'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        disabledBackgroundColor: Colors.green.withOpacity(0.7),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ConversationsListScreen(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.edit_calendar_outlined, size: 20),
+                      label: const Text('تغيير'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            else
+              // Show approved message
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.green, width: 1),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'تم قبول الموعد',
+                      style: TextStyle(
+                        color: Colors.green,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow({
+    required IconData icon,
+    required String title,
+    required String value,
+    Color? iconColor,
+    bool isNote = false,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: iconColor ?? Colors.grey[600]),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (!isNote)
+                Text(
+                  value,
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color.fromRGBO(151, 81, 0, 1)),
+                )
+              else
+                Text(
+                  title,
+                  style: TextStyle(fontSize: 14, color: Colors.grey[800], fontWeight: FontWeight.bold),
+                ),
+              SizedBox(height: isNote ? 4 : 2),
+              if (isNote)
+                Text(
+                  value,
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600], height: 1.5),
+                )
+              else
+                Text(
+                  title,
+                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+//==============================================================================
+// END: Appointment Card Widget
+//==============================================================================
+
+
 
 class PropertyCard extends StatelessWidget {
   final Property property;
@@ -64,7 +350,7 @@ class PropertyCard extends StatelessWidget {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        margin: const EdgeInsets.symmetric( vertical: 8),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -277,28 +563,6 @@ class PropertyCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      // Expanded(
-                      //   child: Column(
-                      //     crossAxisAlignment: CrossAxisAlignment.start,
-                      //     children: [
-                      //       Text(
-                      //         'مقدم : ${intl.NumberFormat('#,###').format(int.parse(property.submittedPrice))} ج.م',
-                      //         style: const TextStyle(
-                      //           fontSize: 14,
-                      //           fontWeight: FontWeight.w600,
-                      //           color: Colors.black87,
-                      //         ),
-                      //       ),
-                      //       Text(
-                      //         property.submittedBy,
-                      //         style: TextStyle(
-                      //           fontSize: 12,
-                      //           color: Colors.grey[600],
-                      //         ),
-                      //       ),
-                      //     ],
-                      //   ),
-                      // ),
                     ],
                   ),
                   const SizedBox(height: 20),
@@ -568,11 +832,6 @@ class RealStateHomeScreen extends StatefulWidget {
 class _RealStateHomeScreenState extends State<RealStateHomeScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  DateTime _selectedDate = DateTime.now();
-  TimeOfDay _selectedTime = TimeOfDay.now();
-  final TextEditingController _notesController = TextEditingController();
-
-  // --- تم حذف القائمة المحلية `_properties` بالكامل ---
 
   @override
   void initState() {
@@ -580,47 +839,36 @@ class _RealStateHomeScreenState extends State<RealStateHomeScreen>
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(_handleTabSelection);
 
-    // جلب البيانات من الـ Provider فور بناء الشاشة
-    Future.microtask(() =>
-        Provider.of<AuthProvider>(context, listen: false).fetchMyProperties());
+    // --- جلب بيانات العقارات والمواعيد عند بدء تشغيل الشاشة ---
+    Future.microtask(() {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      authProvider.fetchMyProperties();
+      authProvider.fetchAppointments();
+      // بدء الريفريش اللحظي للمواعيد
+      authProvider.startAppointmentsAutoRefresh();
+    });
   }
 
   @override
   void dispose() {
     _tabController.removeListener(_handleTabSelection);
     _tabController.dispose();
-    _notesController.dispose();
+    
+    // إيقاف الريفريش اللحظي عند الخروج من الشاشة
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    authProvider.stopAppointmentsAutoRefresh();
+    
     super.dispose();
   }
 
   void _handleTabSelection() {
+    // إذا تم التبديل إلى تبويب المواعيد (index 0)
+    if (_tabController.index == 0) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      // إجبار ريفريش فوري للمواعيد
+      authProvider.forceRefreshAppointments();
+    }
     setState(() {});
-  }
-
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime(2030),
-    );
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-      });
-    }
-  }
-
-  Future<void> _selectTime(BuildContext context) async {
-    final TimeOfDay? picked = await showTimePicker(
-      context: context,
-      initialTime: _selectedTime,
-    );
-    if (picked != null && picked != _selectedTime) {
-      setState(() {
-        _selectedTime = picked;
-      });
-    }
   }
 
   void _addProperty(BuildContext context) {
@@ -911,7 +1159,6 @@ class _RealStateHomeScreenState extends State<RealStateHomeScreen>
     );
   }
 
-  // استبدل هذه الدالة بالكامل في ملف RealStateHomeScreen.dart
 
   void _editProperty(BuildContext context, Property propertyToEdit) {
     // ملء وحدات التحكم بالبيانات الحالية للعقار
@@ -931,7 +1178,6 @@ class _RealStateHomeScreenState extends State<RealStateHomeScreen>
         TextEditingController(text: propertyToEdit.paymentMethod);
     final areaController = TextEditingController(text: propertyToEdit.area);
 
-    // متغير لحفظ الصورة الجديدة إذا اختار المستخدم واحدة
     File? _newSelectedImage;
 
     showDialog(
@@ -982,7 +1228,6 @@ class _RealStateHomeScreenState extends State<RealStateHomeScreen>
                       padding: const EdgeInsets.all(20),
                       child: Column(
                         children: [
-                          // --- قسم تعديل الصورة ---
                           const Align(
                               alignment: Alignment.centerRight,
                               child: Text("صورة العقار",
@@ -996,7 +1241,6 @@ class _RealStateHomeScreenState extends State<RealStateHomeScreen>
                             decoration: BoxDecoration(
                                 color: Colors.grey[200],
                                 borderRadius: BorderRadius.circular(10)),
-                            // إذا تم اختيار صورة جديدة، اعرضها. وإلا، اعرض الصورة القديمة.
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(10),
                               child: _newSelectedImage != null
@@ -1027,7 +1271,6 @@ class _RealStateHomeScreenState extends State<RealStateHomeScreen>
                               label: const Text("تغيير الصورة")),
                           const Divider(height: 30),
 
-                          // --- باقي الحقول للتعديل ---
                           _buildEnhancedField(
                               icon: Icons.location_on,
                               label: "العنوان",
@@ -1104,40 +1347,36 @@ class _RealStateHomeScreenState extends State<RealStateHomeScreen>
                           child: ElevatedButton.icon(
                             icon: const Icon(Icons.save, size: 18),
                             label: const Text('حفظ التعديلات'),
-                            // في ملف real_state_home_screen.dart، داخل _editProperty
-
 onPressed: () async {
-  // 1. التحقق من صحة البيانات
   if (addressController.text.trim().isEmpty || priceController.text.trim().isEmpty) {
-    // يمكنك إضافة المزيد من شروط التحقق هنا
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('يرجى ملء جميع الحقول المطلوبة'), backgroundColor: Colors.red),
     );
     return;
   }
 
-  // 2. الوصول إلى الـ Provider
   final authProvider = Provider.of<AuthProvider>(context, listen: false);
   
-  // 3. إنشاء كائن محدث بالبيانات الجديدة
   final updatedProperty = Property(
     id: propertyToEdit.id,
     address: addressController.text.trim(),
     type: typeController.text.trim(),
     price: int.parse(priceController.text.trim()),
     description: descController.text.trim(),
-    imageUrl: propertyToEdit.imageUrl, // نستخدم الرابط القديم مبدئيًا، الـ Provider سيقوم بتحديثه
+    imageUrl: propertyToEdit.imageUrl,
     bedrooms: int.parse(bedroomsController.text.trim()),
     bathrooms: int.parse(bathroomsController.text.trim()),
     view: viewController.text.trim(),
     paymentMethod: paymentMethodController.text.trim(),
     area: areaController.text.trim(),
     isReady: isReady,
+    // تمت إزالة الحقول التي ليست في الموديل
+    // submittedBy: '', // أضف قيمة افتراضية إذا كانت مطلوبة
+    // submittedPrice: '', // أضف قيمة افتراضية إذا كانت مطلوبة
     );
   
-  // 4. استدعاء دالة التحديث من الـ Provider مع تمرير البيانات والصورة الجديدة
   final success = await authProvider.updateProperty(
-    updatedProperty: updatedProperty, // <-- تم التصحيح هنا
+    updatedProperty: updatedProperty,
     newImageFile: _newSelectedImage,
   );
   
@@ -1200,23 +1439,28 @@ onPressed: () async {
           children: [
             _buildAppBar(context, _isTablet(context)),
             Container(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                  color: Colors.white, borderRadius: BorderRadius.circular(10)),
+                  color: Colors.white, borderRadius: BorderRadius.circular(25)),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _buildCustomTab(
-                      icon: Icons.calendar_today,
-                      text: 'مواعيدي',
-                      isSelected: _tabController.index == 0,
-                      onTap: () => setState(() => _tabController.animateTo(0))),
-                  const SizedBox(width: 20),
-                  _buildCustomTab(
-                      icon: Icons.home,
-                      text: 'عقاراتي',
-                      isSelected: _tabController.index == 1,
-                      onTap: () => setState(() => _tabController.animateTo(1))),
+                  Expanded(
+                    child: _buildCustomTab(
+                        icon: Icons.calendar_today,
+                        text: 'مواعيدي',
+                        isSelected: _tabController.index == 0,
+                        onTap: () => setState(() => _tabController.animateTo(0))),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildCustomTab(
+                        icon: Icons.home_work_outlined,
+                        text: 'عقاراتي',
+                        isSelected: _tabController.index == 1,
+                        onTap: () => setState(() => _tabController.animateTo(1))),
+                  ),
                 ],
               ),
             ),
@@ -1224,124 +1468,56 @@ onPressed: () async {
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () => _selectTime(context),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16, vertical: 12),
-                                  decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(30)),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(Icons.access_time,
-                                          color: Colors.grey, size: 20),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                          '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')} ${_selectedTime.period == DayPeriod.am ? 'am' : 'pm'}',
-                                          style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold)),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () => _selectDate(context),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16, vertical: 12),
-                                  decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(30)),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(Icons.calendar_today,
-                                          color: Colors.grey, size: 20),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                          intl.DateFormat('dd/MM/yyyy')
-                                              .format(_selectedDate),
-                                          style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold)),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                  // --- START: "مواعيدي" Tab ---
+                  Consumer<AuthProvider>(
+                    builder: (context, provider, child) {
+                      if (provider.isLoadingAppointments) {
+                        return const Center(child: CircularProgressIndicator(color: Colors.orange));
+                      }
+
+                      if (provider.appointmentsError != null) {
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Text('حدث خطأ: ${provider.appointmentsError}', textAlign: TextAlign.center),
+                          ),
+                        );
+                      }
+
+                      if (provider.appointments.isEmpty) {
+                        return const Center(
+                          child: Text(
+                            'لا توجد مواعيد مقترحة حاليًا.',
+                            style: TextStyle(fontSize: 16, color: Colors.grey),
+                          ),
+                        );
+                      }
+
+                      return RefreshIndicator(
+                        onRefresh: () async {
+                          // إجبار الريفريش الفوري
+                          await provider.forceRefreshAppointments();
+                          // ثم جلب البيانات الكاملة
+                          await provider.fetchAppointments();
+                        },
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                          itemCount: provider.appointments.length,
+                          itemBuilder: (context, index) {
+                            final appointment = provider.appointments[index];
+                            return AppointmentCard(
+        // استخدم ValueKey مع id الموعد لتعطيه هوية فريدة
+        key: ValueKey(appointment.id), 
+        appointment: appointment,
+      );
+                          },
                         ),
-                        const SizedBox(height: 20),
-                        Container(
-                          decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16)),
-                          child: TextField(
-                              controller: _notesController,
-                              maxLines: 4,
-                              textAlign: TextAlign.right,
-                              decoration: const InputDecoration(
-                                  hintText: 'ملاحظات',
-                                  hintStyle: TextStyle(color: Colors.grey),
-                                  border: InputBorder.none,
-                                  contentPadding: EdgeInsets.all(16))),
-                        ),
-                        const SizedBox(height: 20),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () {},
-                                style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.orange,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 16),
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(30))),
-                                child: const Text('تغيير مع الإدارة',
-                                    style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold)),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () {},
-                                style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.green,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 16),
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(30))),
-                                child: const Text('قبول موعد',
-                                    style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold)),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
+                  // --- END: "مواعيدي" Tab ---
+
+                  // --- START: "عقاراتي" Tab ---
                   Stack(
                     children: [
                       Consumer<AuthProvider>(
@@ -1355,53 +1531,50 @@ onPressed: () async {
                             return const Center(
                                 child: Text('لم تقم بإضافة أي عقارات بعد'));
                           }
-                          return ListView.builder(
-                            padding: EdgeInsets.only(
-                                top: 8,
-                                bottom: 80 + paddingBottom,
-                                left: 16,
-                                right: 16),
-                            itemCount: authProvider.properties.length,
-                            itemBuilder: (context, index) {
-                              final property = authProvider.properties[index];
-                              return PropertyCard(
-                                property: property,
-                                // --- الربط الصحيح هنا ---
-                                onEdit: () => _editProperty(context, property),
-                                onDelete: () =>
-                                    _deleteProperty(context, property),
-                              );
-                            },
+                          return RefreshIndicator(
+                            onRefresh: () => authProvider.fetchMyProperties(),
+                            child: ListView.builder(
+                              padding: EdgeInsets.only(
+                                  top: 8,
+                                  bottom: 80 + paddingBottom,
+                                  left: 16,
+                                  right: 16),
+                              itemCount: authProvider.properties.length,
+                              itemBuilder: (context, index) {
+                                final property = authProvider.properties[index];
+                                return PropertyCard(
+                                  property: property,
+                                  onEdit: () => _editProperty(context, property),
+                                  onDelete: () =>
+                                      _deleteProperty(context, property),
+                                );
+                              },
+                            ),
                           );
                         },
                       ),
                       Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          color: Colors.grey[100],
-                          child: SafeArea(
-                            child: ElevatedButton(
-                              onPressed: () => _addProperty(context),
-                              style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.orange,
-                                  foregroundColor: Colors.white,
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 10),
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12))),
-                              child: const Text('إضافة عقار',
-                                  style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold)),
-                            ),
-                          ),
+                        left: 16,
+                        right: 16,
+                        bottom: 16,
+                        child: ElevatedButton(
+                          onPressed: () => _addProperty(context),
+                          style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange,
+                              foregroundColor: Colors.white,
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12))),
+                          child: const Text('إضافة عقار',
+                              style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold)),
                         ),
                       ),
                     ],
                   ),
+                  // --- END: "عقاراتي" Tab ---
                 ],
               ),
             ),
@@ -1415,50 +1588,6 @@ onPressed: () async {
 
   bool _isTablet(BuildContext context) =>
       MediaQuery.of(context).size.width >= 768;
-
-  Widget _buildSectionCard(
-      {required String title,
-      required IconData icon,
-      required List<Widget> children}) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2))
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                    color: Colors.orange.shade50,
-                    borderRadius: BorderRadius.circular(8)),
-                child: Icon(icon, color: Colors.orange.shade500, size: 18),
-              ),
-              const SizedBox(width: 10),
-              Text(title,
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: Colors.grey.shade800)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ...children,
-        ],
-      ),
-    );
-  }
 
   Widget _buildEnhancedField(
       {required IconData icon,
@@ -1534,8 +1663,15 @@ onPressed: () async {
               children: [
                 _buildActionButton(
                     icon: Icons.message_outlined,
-                    badge: "5",
-                    onTap: () {},
+                    badge: "",
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ConversationsListScreen(),
+                        ),
+                      );
+                    },
                     isTablet: isTablet),
                 SizedBox(width: isTablet ? 16.0 : 12.0),
                 _buildActionButton(
@@ -1608,24 +1744,25 @@ onPressed: () async {
       required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: isSelected ? Colors.orange : Colors.grey[200],
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon,
                 color: isSelected ? Colors.white : Colors.grey[600], size: 20),
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             Text(text,
                 style: TextStyle(
-                    color: isSelected ? Colors.white : Colors.grey[600],
-                    fontSize: 16,
+                    color: isSelected ? Colors.white : Colors.grey[800],
+                    fontSize: 15,
                     fontWeight:
-                        isSelected ? FontWeight.bold : FontWeight.normal)),
+                        isSelected ? FontWeight.bold : FontWeight.w600)),
           ],
         ),
       ),

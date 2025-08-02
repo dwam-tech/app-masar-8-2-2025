@@ -6,10 +6,36 @@ import 'package:intl/intl.dart'; // إضافة مكتبة intl لتنسيق ال
 import 'package:saba2v2/services/laravel_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+// enum AuthStatus {
+//   UNINITIALIZED,
+//   AUTHENTICATED,
+//   AUTHENTICATING,
+//   UNAUTHENTICATED,
+//   FAILED
+// }
+
+
 const String baseUrl = 'http://192.168.1.7:8000';
 
 class AuthService {
-  final LaravelService _laravelService = LaravelService();
+final LaravelService _laravelService = LaravelService();
+
+  // AuthStatus _status = AuthStatus.UNINITIALIZED;
+  // bool _isLoading = false;
+  // String? _errorMessage;
+  // Map<String, dynamic>? _userData;
+
+  // // ----------------- Getters (للوصول إلى الحالة من الواجهة) -----------------
+  // AuthStatus get status => _status;
+  // bool get isLoading => _isLoading;
+  // String? get errorMessage => _errorMessage;
+  // Map<String, dynamic>? get userData => _userData;
+
+  // 
+  
+
+
+  
 
   Future<Map<String, dynamic>> registerNormalUser({
     required String name,
@@ -274,24 +300,9 @@ class AuthService {
     }
   }
 
-//  Future<Map<String, dynamic>> login({
-//     required String email,
-//     required String password,
-//   }) async {
-//     try {
-//       final result = await _authService.login(email: email, password: password);
-
-//       // إذا نجح تسجيل الدخول، قم بتحديث حالة التطبيق
-//       if (result['status'] == true) {
-//         await _loadUserSession(); // هذه الدالة ستقوم بجلب التوكن والبيانات المحفوظة وتحديث isLoggedIn
-//       }
-//       return result;
-//     } catch (e) {
-//       return {'status': false, 'message': e.toString()};
-//     }
-//   }
-
- Future<Map<String, dynamic>> login({
+//------------------- بدايه اخر كومنت------------------------------------------
+//------------------------------------------------------------------------------
+ /* Future<Map<String, dynamic>> login({
   required String email,
   required String password,
 }) async {
@@ -333,64 +344,60 @@ class AuthService {
     throw Exception('Error during login: $e');
   }
 }
+
   Future<void> _saveToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('token', token);
   }
 
-
-  Future<void> _saveUserData(Map<String, dynamic> userData) async {
+Future<void> _saveUserData(Map<String, dynamic> userData) async {
     final prefs = await SharedPreferences.getInstance();
 
-    // 1. حفظ بيانات المستخدم الكاملة كنص JSON للرجوع إليها عند الحاجة
+    // 1. حفظ بيانات المستخدم الكاملة
     await prefs.setString('user_data', jsonEncode(userData));
 
-    // 2. حفظ الـ ID الخاص بكيان مكتب التأجير الرئيسي (CarRental)
+    // 2. حفظ بيانات تأجير السيارات
     if (userData['car_rental']?['id'] != null) {
       final carRentalId = userData['car_rental']['id'];
       await prefs.setInt('car_rental_id', carRentalId);
       debugPrint("AuthService: Saved car_rental_id -> $carRentalId");
     }
 
-    // 3. التحقق من وجود تفاصيل المكتب وحفظ كل البيانات الهامة منها
     final officeDetail = userData['car_rental']?['office_detail'];
     if (officeDetail != null) {
-      // حفظ الـ ID الخاص بتفاصيل المكتب
       if (officeDetail['id'] != null) {
-        final officeDetailId = officeDetail['id'];
-        await prefs.setInt('car_rental_office_detail_id', officeDetailId);
-        debugPrint("AuthService: Saved car_rental_office_detail_id -> $officeDetailId");
+        await prefs.setInt('car_rental_office_detail_id', officeDetail['id']);
       }
-
-      // **الإضافة الأهم: حفظ حالة المفاتيح بشكل صريح**
-      // هذا يضمن أن الشاشة الرئيسية ستجد هذه القيم عند التحميل
       if (officeDetail['is_available_for_delivery'] != null) {
-        final isDelivery = (officeDetail['is_available_for_delivery'] == true || officeDetail['is_available_for_delivery'] == 1);
-        await prefs.setBool('is_delivery_enabled', isDelivery);
-        debugPrint("AuthService: Saved is_delivery_enabled -> $isDelivery");
+        await prefs.setBool('is_delivery_enabled', officeDetail['is_available_for_delivery'] == true || officeDetail['is_available_for_delivery'] == 1);
       }
-
       if (officeDetail['is_available_for_rent'] != null) {
-        final isRent = (officeDetail['is_available_for_rent'] == true || officeDetail['is_available_for_rent'] == 1);
-        await prefs.setBool('is_rental_enabled', isRent);
-        debugPrint("AuthService: Saved is_rental_enabled -> $isRent");
+        await prefs.setBool('is_rental_enabled', officeDetail['is_available_for_rent'] == true || officeDetail['is_available_for_rent'] == 1);
       }
     }
 
-    // 4. حفظ بيانات العقارات (إذا وجدت)
+    // 3. حفظ بيانات العقارات
     if (userData['real_estate']?['id'] != null) {
       final realEstateId = userData['real_estate']['id'];
       await prefs.setInt('real_estate_id', realEstateId);
       debugPrint("AuthService: Saved real_estate_id -> $realEstateId");
     }
+    
+    // ==========================================================
+    // --- 4. الإضافة الجديدة: حفظ بيانات المطاعم ---
+    // ==========================================================
+    if (userData['restaurant_detail']?['id'] != null) {
+      final restaurantId = userData['restaurant_detail']['id'];
+      // **نستخدم نفس المفتاح 'real_estate_id' لتسهيل الأمر على AuthProvider**
+      await prefs.setInt('restaurantId', restaurantId); 
+      debugPrint("AuthService SUCCESS: Saved restaurantId as 'restaurantId' -> $restaurantId");
+    }
   }
-
 
   Future<int?> getRealEstateId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getInt('real_estate_id');
   }
-
 
   Future<void> logout() async {
     try {
@@ -399,7 +406,8 @@ class AuthService {
       throw Exception('Error during logout: $e');
     }
   }
-
+ 
+ 
   Future<String?> getToken() async {
     return await _laravelService.getToken();
   }
@@ -407,4 +415,128 @@ class AuthService {
   Future<Map<String, dynamic>?> getUserData() async {
     return await _laravelService.getUserData();
   }
+*/
+//--------------------نهايه اخر كومنت ----------------------------------
+ //---------------------------------------------------------------------
+ 
+
+ 
+
+
+ Future<Map<String, dynamic>> login({required String email, required String password}) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/login'),
+        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+        body: jsonEncode({'email': email, 'password': password}),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        debugPrint("AuthService: Login successful. API Response received.");
+        
+        // **التصحيح الحاسم: قراءة التوكن والبيانات من المسار الصحيح**
+        if (responseData['token'] != null && responseData['user'] != null) {
+          await _saveSession(
+            token: responseData['token'], // المسار الصحيح
+            userData: responseData['user'],
+          );
+        }
+        return {'status': true, 'message': 'Login successful', 'user': responseData['user']};
+      } else {
+        final errorData = jsonDecode(response.body);
+        throw Exception(errorData['message'] ?? 'Failed to login');
+      }
+    } catch (e) {
+      throw Exception('Network or server error during login: $e');
+    }
+  }
+
+  /// دالة حفظ الجلسة (النسخة النهائية المصححة لتطابق الـ JSON)
+  Future<void> _saveSession({required String token, required Map<String, dynamic> userData}) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('token', token);
+    await prefs.setString('user_data', jsonEncode(userData));
+    
+    await prefs.remove('entity_id'); // تصفير الـ ID القديم لضمان عدم التداخل
+    
+    // **التصحيح الحاسم: قراءة ID المطعم من المسار الصحيح**
+    int? entityId;
+    if (userData['restaurant_detail']?['id'] != null) {
+      entityId = userData['restaurant_detail']['id'];
+      debugPrint("AuthService SUCCESS: Found and saving restaurant ID: $entityId");
+    } else if (userData['real_estate']?['id'] != null) {
+      entityId = userData['real_estate']['id'];
+      debugPrint("AuthService SUCCESS: Found and saving real estate ID: $entityId");
+    }
+
+    if (entityId != null) {
+      // استخدام مفتاح موحد لحفظ ID المطعم أو العقار
+      await prefs.setInt('entity_id', entityId);
+    }
+  }
+
+  /// دالة تسجيل الخروج (النسخة النهائية الصحيحة)
+  Future<void> logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('token');
+    await prefs.remove('user_data');
+    await prefs.remove('entity_id');
+    try {
+      await _laravelService.logout();
+    } catch (e) {
+      debugPrint("Ignoring server logout error: $e");
+    }
+  }
+
+  // --- دوال مساعدة (النسخة النهائية الصحيحة) ---
+  Future<String?> getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('token');
+  }
+
+  Future<Map<String, dynamic>?> getUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = prefs.getString('user_data');
+    return data != null ? jsonDecode(data) : null;
+  }
+
+  Future<int?> getRealEstateId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('entity_id');
+  }
+
+
+  //--------------------------------------------
+
+  Future<Map<String, dynamic>> fetchSettings() async {
+    final url = Uri.parse('$baseUrl/api/settings'); // استخدام نفس الـ baseUrl
+    
+    try {
+      final response = await http.get(
+        url,
+        headers: {'Accept': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        
+        if (data['status'] == true && data['settings'] != null) {
+          // إذا نجح الطلب، قم بإرجاع خريطة الإعدادات
+          return data['settings'] as Map<String, dynamic>;
+        } else {
+          // في حال كان الرد من السيرفر بصيغة غير متوقعة
+          throw Exception('صيغة الرد من الـ API غير صحيحة.');
+        }
+      } else {
+        // في حال فشل الطلب (مثل خطأ 404 أو 500)
+        throw Exception('فشل تحميل الإعدادات. رمز الحالة: ${response.statusCode}');
+      }
+    } catch (e) {
+      // للتعامل مع أخطاء الشبكة أو أخطاء أخرى
+      debugPrint('حدث خطأ أثناء جلب الإعدادات: $e');
+      throw Exception('لا يمكن الاتصال بالخادم. يرجى التحقق من اتصالك بالإنترنت.');
+    }
+  }
+
 }

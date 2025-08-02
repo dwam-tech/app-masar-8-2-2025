@@ -43,6 +43,7 @@ import 'package:saba2v2/screens/business/ResturantScreens/ResturantHomeScreen.da
 import 'package:saba2v2/screens/business/ResturantScreens/ResturantInformation.dart';
 import 'package:saba2v2/screens/business/ResturantScreens/ResturantLawData.dart';
 import 'package:saba2v2/screens/business/ResturantScreens/ResturantWorkeTime.dart';
+import 'package:saba2v2/screens/restaurant_orders_screen.dart';
 import 'package:saba2v2/screens/business/RealStateScreens/SubscriptionRegistrationOfficeScreen.dart';
 import 'package:saba2v2/screens/business/RealStateScreens/SubscriptionRegistrationSingleScreen.dart';
 import 'package:saba2v2/screens/business/CarsScreens/delivery_registration_screen.dart';
@@ -58,6 +59,8 @@ import 'package:saba2v2/screens/user/restaurant-details.dart';
 import 'package:saba2v2/screens/user/user_home_screen.dart';
 import 'package:saba2v2/screens/user/profile_screen.dart';
 import 'package:saba2v2/screens/business/CarsScreens/delivery_office_information.dart';
+import 'package:saba2v2/screens/chat_screen.dart';
+import 'package:saba2v2/screens/conversations_list_screen.dart';
 
 class AppRouter {
   static GoRouter createRouter(AuthProvider authProvider) {
@@ -206,6 +209,11 @@ class AppRouter {
           builder: (context, state) => const ResturantHomeScreen(),
         ),
         GoRoute(
+          path: '/restaurant-orders',
+          name: 'restaurantOrders',
+          builder: (context, state) => const RestaurantOrdersScreen(),
+        ),
+        GoRoute(
           path: '/Menu',
           name: 'Menu',
           builder: (context, state) => const RestaurantMenuScreen(),
@@ -324,6 +332,16 @@ class AppRouter {
           builder: (context, state) => const SettingsUser(),
         ),
         // شاشات إضافية
+        GoRoute(
+          path: '/conversations',
+          name: 'conversations',
+          builder: (context, state) => const ConversationsListScreen(),
+        ),
+        GoRoute(
+          path: '/chat',
+          name: 'chat',
+          builder: (context, state) => const ChatScreen(),
+        ),
         GoRoute(
           path: '/NotificationsScreen',
           name: 'NotificationsScreen',

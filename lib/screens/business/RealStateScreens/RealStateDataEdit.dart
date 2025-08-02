@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:saba2v2/services/real_estate_service.dart';
 
 class RealStateDataEdit extends StatefulWidget {
   const RealStateDataEdit({super.key});
@@ -11,13 +12,18 @@ class RealStateDataEdit extends StatefulWidget {
 class _RealStateDataEditState extends State<RealStateDataEdit> {
   bool isEditMode = false;
   bool _isLoading = false;
+  bool _isDataLoading = true;
+  
+  final RealEstateService _realEstateService = RealEstateService();
+  Map<String, dynamic>? _userData;
+  String? _userType;
 
-  // بيانات المكتب الافتراضية (تبدل لاحقاً بالبيانات الحقيقية)
-  String officeName = "مكتب النجاح العقاري";
-  String address = "عنوان المكتب الحالي";
-  String city = "القاهرة";
-  String phone = "01012345678";
-  String email = "office@email.com";
+  // بيانات المكتب/السمسار
+  String officeName = "";
+  String address = "";
+  String city = "";
+  String phone = "";
+  String email = "";
 
   // كنترولرز
   late final TextEditingController officeNameController;
@@ -59,10 +65,54 @@ class _RealStateDataEditState extends State<RealStateDataEdit> {
   @override
   void initState() {
     super.initState();
-    officeNameController = TextEditingController(text: officeName);
-    addressController = TextEditingController(text: address);
-    phoneController = TextEditingController(text: phone);
-    emailController = TextEditingController(text: email);
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    try {
+      setState(() => _isDataLoading = true);
+      
+      _userData = await _realEstateService.getCurrentUserData();
+      
+      if (_userData != null) {
+        _userType = _userData!['user_type'];
+        
+        // تحديد البيانات حسب نوع المستخدم
+        if (_userType == 'real_estate_office' && _userData!['real_estate']?['office_detail'] != null) {
+          final officeDetail = _userData!['real_estate']['office_detail'];
+          officeName = officeDetail['office_name'] ?? '';
+          address = officeDetail['office_address'] ?? '';
+          phone = officeDetail['office_phone'] ?? _userData!['phone'] ?? '';
+        } else if (_userType == 'real_estate_individual' && _userData!['real_estate']?['individual_detail'] != null) {
+          final individualDetail = _userData!['real_estate']['individual_detail'];
+          officeName = individualDetail['agent_name'] ?? _userData!['name'] ?? '';
+          address = ''; // السمسار الفردي لا يحتاج عنوان مكتب
+          phone = _userData!['phone'] ?? '';
+        }
+        
+        // البيانات المشتركة
+        city = _userData!['governorate'] ?? '';
+        email = _userData!['email'] ?? '';
+        
+        // تهيئة الكنترولرز
+        officeNameController = TextEditingController(text: officeName);
+        addressController = TextEditingController(text: address);
+        phoneController = TextEditingController(text: phone);
+        emailController = TextEditingController(text: email);
+      }
+    } catch (e) {
+      debugPrint('Error loading user data: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في تحميل البيانات: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _isDataLoading = false);
+    }
   }
 
   @override
@@ -77,31 +127,100 @@ class _RealStateDataEditState extends State<RealStateDataEdit> {
   Future<void> _saveData() async {
     setState(() => _isLoading = true);
 
-    await Future.delayed(const Duration(milliseconds: 800));
+    try {
+      bool success = false;
+      
+      if (_userType == 'real_estate_office') {
+        success = await _realEstateService.updateOfficeData(
+          officeName: officeNameController.text,
+          officeAddress: addressController.text,
+          officePhone: phoneController.text,
+          governorate: city,
+          email: emailController.text,
+        );
+      } else if (_userType == 'real_estate_individual') {
+        success = await _realEstateService.updateIndividualData(
+          agentName: officeNameController.text,
+          phone: phoneController.text,
+          governorate: city,
+          email: emailController.text,
+        );
+      }
 
-    setState(() {
-      officeName = officeNameController.text;
-      address = addressController.text;
-      phone = phoneController.text;
-      email = emailController.text;
-      isEditMode = false;
-      _isLoading = false;
-    });
+      if (success) {
+        setState(() {
+          officeName = officeNameController.text;
+          address = addressController.text;
+          phone = phoneController.text;
+          email = emailController.text;
+          isEditMode = false;
+        });
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('تم حفظ البيانات بنجاح'),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('تم حفظ البيانات بنجاح'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+        }
+      } else {
+        throw Exception('فشل في حفظ البيانات');
+      }
+    } catch (e) {
+      debugPrint('Error saving data: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في حفظ البيانات: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isDataLoading) {
+      return Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          backgroundColor: const Color(0xFFF8F9FA),
+          appBar: AppBar(
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_rounded),
+              onPressed: () => context.pop(),
+              style: IconButton.styleFrom(
+                foregroundColor: Colors.orange,
+              ),
+            ),
+            title: Text(
+              _userType == 'real_estate_office' ? 'بيانات المكتب العقاري' : 'بيانات السمسار',
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 20,
+                color: Colors.orange,
+              ),
+            ),
+            backgroundColor: Colors.white,
+            elevation: 0,
+          ),
+          body: const Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
@@ -204,24 +323,26 @@ class _RealStateDataEditState extends State<RealStateDataEdit> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _SectionTitle(
-                    title: "معلومات المكتب العقاري",
+                    title: _userType == 'real_estate_office' ? "معلومات المكتب العقاري" : "معلومات السمسار",
                     icon: Icons.business,
                   ),
                   const SizedBox(height: 20),
                   _buildField(
-                    "اسم المكتب",
+                    _userType == 'real_estate_office' ? "اسم المكتب" : "اسم السمسار",
                     officeName,
                     controller: officeNameController,
                     icon: Icons.home_work_outlined,
                   ),
                   const SizedBox(height: 16),
-                  _buildField(
-                    "عنوان المكتب",
-                    address,
-                    controller: addressController,
-                    icon: Icons.location_on_outlined,
-                  ),
-                  const SizedBox(height: 16),
+                  if (_userType == 'real_estate_office') ...[
+                    _buildField(
+                      "عنوان المكتب",
+                      address,
+                      controller: addressController,
+                      icon: Icons.location_on_outlined,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   _buildCityField(),
                   const SizedBox(height: 16),
                   _buildField(
@@ -463,7 +584,7 @@ class _SectionTitle extends StatelessWidget {
     return Row(
       children: [
         Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(5),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               colors: [Color(0xFFFF6B35), Color(0xFFFF8F50)],

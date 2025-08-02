@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:saba2v2/providers/auth_provider.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -13,9 +15,45 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Timer(const Duration(seconds: 3), () {
+    _checkAuthAndNavigate();
+  }
+
+  Future<void> _checkAuthAndNavigate() async {
+    // انتظار 3 ثوانٍ لعرض شاشة البداية
+    await Future.delayed(const Duration(seconds: 3));
+    
+    if (!mounted) return;
+    
+    // التحقق من حالة المصادقة
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    if (authProvider.isLoggedIn && authProvider.userData != null) {
+      // إذا كان المستخدم مسجل دخول، توجيهه إلى الصفحة المناسبة حسب نوع المستخدم
+      final userType = authProvider.userType;
+      
+      switch (userType) {
+        case 'normal':
+          context.go('/UserHomeScreen');
+          break;
+        case 'real_estate_office':
+        case 'real_estate_individual':
+          context.go('/RealStateHomeScreen');
+          break;
+        case 'restaurant':
+          context.go('/restaurant-home');
+          break;
+        case 'car_rental_office':
+        case 'driver':
+          context.go('/delivery-homescreen');
+          break;
+        default:
+          // في حالة نوع مستخدم غير معروف، توجيه إلى onboarding
+          context.go('/onboarding');
+      }
+    } else {
+      // إذا لم يكن مسجل دخول، توجيه إلى onboarding
       context.go('/onboarding');
-    });
+    }
   }
 
   @override
