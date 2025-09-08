@@ -271,10 +271,9 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen>
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
--      final result = await authProvider.resendEmailOtp(email: widget.email);
-+      final result = widget.purpose == 'password_reset'
-+          ? await authProvider.sendPasswordResetOtp(email: widget.email)
-+          : await authProvider.resendEmailOtp(email: widget.email);
+      final result = widget.purpose == 'password_reset'
+          ? await authProvider.sendPasswordResetOtp(email: widget.email)
+          : await authProvider.resendEmailOtp(email: widget.email);
       
       print('DEBUG OTP: Resend API Response: $result');
 

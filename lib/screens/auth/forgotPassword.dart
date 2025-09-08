@@ -145,7 +145,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             ),
                             const SizedBox(height: 24),
                             const Text(
-                              'قم بكتابة البريد أو رقم الهاتف بك لنتمكن من تلقى الرقم التأكيدي الخاص بك',
+                              'قم بكتابة البريد الخاص بك لنتمكن من تلقى الرقم التأكيدي الخاص بك',
                               style: TextStyle(
                                 fontSize: 16,
                                 color: Colors.black87,
@@ -159,7 +159,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                               textAlign: TextAlign.right,
                               textDirection: TextDirection.ltr,
                               decoration: InputDecoration(
-                                labelText: 'البريد الإلكتروني أو رقم الهاتف',
+                                labelText: 'البريد الإلكتروني',
                                 prefixIcon: Icon(Icons.email_outlined, color: Colors.grey[600]),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -183,30 +183,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                               ),
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
-                                  return 'الرجاء إدخال البريد الإلكتروني أو رقم الهاتف';
+                                  return 'الرجاء إدخال البريد الإلكتروني';
                                 }
-                                
+
                                 final trimmedValue = value.trim();
-                                
-                                // التحقق من صحة البريد الإلكتروني
-                                final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4} ');
-                                if (emailRegex.hasMatch(trimmedValue)) {
-                                  return null; // بريد إلكتروني صحيح
+
+                                // التحقق من صحة البريد الإلكتروني فقط (المطلوب من الAPI)
+                                final emailRegex = RegExp(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$');
+                                if (!emailRegex.hasMatch(trimmedValue)) {
+                                  return 'الرجاء إدخال بريد إلكتروني صحيح';
                                 }
-                                
-                                // التحقق من صحة رقم الهاتف المصري
-                                final cleanPhone = trimmedValue.replaceAll(RegExp(r'[\s\-\(\)]'), '');
-                                final phoneRegex = RegExp(r'^(010|011|012|015)\d{8}$');
-                                final phoneWithCountryCode = RegExp(r'^(\+2010|\+2011|\+2012|\+2015)\d{8}$');
-                                final phoneWithZeros = RegExp(r'^(0020010|0020011|0020012|0020015)\d{8}$');
-                                
-                                if (phoneRegex.hasMatch(cleanPhone) || 
-                                    phoneWithCountryCode.hasMatch(cleanPhone) || 
-                                    phoneWithZeros.hasMatch(cleanPhone)) {
-                                  return null; // رقم هاتف صحيح
-                                }
-                                
-                                return 'الرجاء إدخال بريد إلكتروني أو رقم هاتف مصري صحيح';
+
+                                return null; // بريد إلكتروني صحيح
                               },
                             ),
                             const SizedBox(height: 24),
