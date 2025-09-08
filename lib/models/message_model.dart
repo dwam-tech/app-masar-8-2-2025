@@ -1,7 +1,9 @@
+import 'conversation_model.dart';
+
 class Message {
   final int id;
   final int? conversationId;
-  final int senderId;
+  final int? senderId; // كان int -> أصبح nullable لدعم رسائل النظام
   final String content;
   final DateTime? readAt;
   final DateTime createdAt;
@@ -11,7 +13,7 @@ class Message {
   Message({
     required this.id,
     this.conversationId,
-    required this.senderId,
+    this.senderId, // لم يعد مطلوبًا دائمًا
     required this.content,
     this.readAt,
     required this.createdAt,
@@ -23,7 +25,7 @@ class Message {
     return Message(
       id: json['id'] as int,
       conversationId: json['conversation_id'] as int?,
-      senderId: json['sender_id'] as int,
+      senderId: json['sender_id'] as int?, // قد تكون null لرسائل النظام
       content: json['content'] as String,
       readAt: json['read_at'] != null 
           ? DateTime.parse(json['read_at'] as String)
@@ -38,7 +40,7 @@ class Message {
     return {
       'id': id,
       'conversation_id': conversationId,
-      'sender_id': senderId,
+      'sender_id': senderId, // قد تكون null
       'content': content,
       'read_at': readAt?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
@@ -50,7 +52,7 @@ class Message {
   /// إنشاء رسالة محلية مؤقتة قبل الإرسال للخادم
   Message.local({
     this.conversationId,
-    required this.senderId,
+    required this.senderId, // لازالت مطلوبة محليًا لرسائل المستخدم
     required this.content,
     this.senderName,
     this.senderAvatar,
@@ -92,11 +94,13 @@ class MessagesResponse {
   final bool status;
   final List<Message> messages;
   final String? message;
+  final PaginationInfo? pagination;
 
   MessagesResponse({
     required this.status,
     required this.messages,
     this.message,
+    this.pagination,
   });
 
   factory MessagesResponse.fromJson(Map<String, dynamic> json) {
@@ -107,6 +111,9 @@ class MessagesResponse {
               .toList() ??
           [],
       message: json['message'] as String?,
+      pagination: json['pagination'] != null
+          ? PaginationInfo.fromJson(json['pagination'] as Map<String, dynamic>)
+          : null,
     );
   }
 }

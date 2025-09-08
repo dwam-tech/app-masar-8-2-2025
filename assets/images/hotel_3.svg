@@ -1,0 +1,77 @@
+<svg width="300" height="200" viewBox="0 0 300 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="skyGradient3" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#4169E1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E6F3FF;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="buildingGradient3" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#708090;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2F4F4F;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="glassGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#E0F6FF;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#87CEEB;stop-opacity:0.6" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="300" height="200" fill="url(#skyGradient3)"/>
+  
+  <!-- Modern Building -->
+  <rect x="60" y="40" width="180" height="160" fill="url(#buildingGradient3)" stroke="#1C1C1C" stroke-width="2"/>
+  
+  <!-- Glass Facade -->
+  <rect x="70" y="50" width="160" height="140" fill="url(#glassGradient)" stroke="#4682B4" stroke-width="1"/>
+  
+  <!-- Window Grid -->
+  <g stroke="#4682B4" stroke-width="1" fill="none">
+    <!-- Vertical lines -->
+    <line x1="110" y1="50" x2="110" y2="190"/>
+    <line x1="150" y1="50" x2="150" y2="190"/>
+    <line x1="190" y1="50" x2="190" y2="190"/>
+    
+    <!-- Horizontal lines -->
+    <line x1="70" y1="80" x2="230" y2="80"/>
+    <line x1="70" y1="110" x2="230" y2="110"/>
+    <line x1="70" y1="140" x2="230" y2="140"/>
+    <line x1="70" y1="170" x2="230" y2="170"/>
+  </g>
+  
+  <!-- Reflections on glass -->
+  <rect x="75" y="55" width="15" height="30" fill="white" opacity="0.3"/>
+  <rect x="115" y="85" width="10" height="20" fill="white" opacity="0.3"/>
+  <rect x="155" y="115" width="20" height="15" fill="white" opacity="0.3"/>
+  <rect x="195" y="145" width="12" height="25" fill="white" opacity="0.3"/>
+  
+  <!-- Modern Entrance -->
+  <rect x="130" y="170" width="40" height="30" fill="#1C1C1C" stroke="#333" stroke-width="2"/>
+  <rect x="135" y="175" width="30" height="20" fill="url(#glassGradient)"/>
+  
+  <!-- Hotel Logo -->
+  <rect x="110" y="15" width="80" height="30" fill="#FF4500" stroke="#FF6347" stroke-width="2" rx="10"/>
+  <text x="150" y="35" text-anchor="middle" fill="white" font-family="Arial" font-size="14" font-weight="bold">MODERN</text>
+  
+  <!-- Rooftop Elements -->
+  <rect x="80" y="35" width="8" height="15" fill="#FF4500"/>
+  <rect x="95" y="30" width="6" height="20" fill="#FF4500"/>
+  <rect x="205" y="32" width="10" height="18" fill="#FF4500"/>
+  <rect x="220" y="28" width="7" height="22" fill="#FF4500"/>
+  
+  <!-- Modern Landscaping -->
+  <rect x="20" y="180" width="40" height="20" fill="#32CD32" rx="10"/>
+  <rect x="240" y="180" width="40" height="20" fill="#32CD32" rx="10"/>
+  
+  <!-- Geometric decorations -->
+  <polygon points="30,160 40,170 30,180 20,170" fill="#FF6347"/>
+  <polygon points="270,160 280,170 270,180 260,170" fill="#FF6347"/>
+  
+  <!-- City lights effect -->
+  <circle cx="85" cy="65" r="2" fill="#FFD700" opacity="0.8"/>
+  <circle cx="125" cy="95" r="2" fill="#FFD700" opacity="0.8"/>
+  <circle cx="165" cy="125" r="2" fill="#FFD700" opacity="0.8"/>
+  <circle cx="205" cy="155" r="2" fill="#FFD700" opacity="0.8"/>
+  
+  <!-- Modern clouds -->
+  <ellipse cx="50" cy="40" rx="20" ry="8" fill="white" opacity="0.7"/>
+  <ellipse cx="250" cy="50" rx="25" ry="10" fill="white" opacity="0.7"/>
+</svg>

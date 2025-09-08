@@ -3,9 +3,10 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:saba2v2/models/order_model.dart';
 import 'package:saba2v2/services/auth_service.dart';
+import '../config/constants.dart';
 
 class OrderService {
-  final String _baseUrl = 'http://192.168.1.7:8000';
+  final String _baseUrl = AppConstants.baseUrl;
   final AuthService _authService = AuthService();
 
   /// جلب جميع الطلبات
@@ -303,6 +304,76 @@ class OrderService {
 
       throw Exception(
           'خطأ في إكمال الطلب (${response.statusCode}): $errorMessage');
+    }
+  }
+
+   Future<Map<String, dynamic>> createOrder({
+    required int restaurantId,
+    required List<Map<String, dynamic>> items,
+    required String deliveryAddress,
+    String? notes,
+  }) async {
+    print('🛒 [OrderService] بدء إنشاء طلب جديد للمطعم: $restaurantId');
+    
+    final token = await _authService.getToken();
+    if (token == null) {
+      throw Exception('المستخدم غير مسجل الدخول');
+    }
+
+    final uri = Uri.parse('$_baseUrl/api/orders');
+    final requestBody = {
+      'restaurant_id': restaurantId,
+      'items': items,
+      'delivery_address': deliveryAddress,
+      'notes': notes ?? '',
+    };
+
+    print('🛒 [OrderService] URL: $uri');
+    print('🛒 [OrderService] Request Body: ${jsonEncode(requestBody)}');
+
+    try {
+      final response = await http.post(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      print('🛒 [OrderService] Response Status: ${response.statusCode}');
+      print('🛒 [OrderService] Response Body: ${response.body}');
+
+      final responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (responseData['status'] == true) {
+          print('✅ [OrderService] تم إنشاء الطلب بنجاح');
+          return responseData;
+        } else {
+          throw Exception(responseData['message'] ?? 'فشل في إنشاء الطلب');
+        }
+      } else if (response.statusCode == 422) {
+        // خطأ في التحقق من صحة البيانات
+        final errors = responseData['errors'] ?? {};
+        final errorMessages = <String>[];
+        
+        errors.forEach((field, messages) {
+          if (messages is List) {
+            errorMessages.addAll(messages.cast<String>());
+          } else {
+            errorMessages.add(messages.toString());
+          }
+        });
+        
+        throw Exception('خطأ في البيانات: ${errorMessages.join(', ')}');
+      } else {
+        throw Exception(responseData['message'] ?? 'فشل في إنشاء الطلب. رمز الخطأ: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ [OrderService] خطأ في إنشاء الطلب: $e');
+      rethrow;
     }
   }
 }

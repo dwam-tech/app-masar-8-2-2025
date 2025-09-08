@@ -53,5 +53,9 @@
                 <string>يحتاج التطبيق إلى الوصول إلى الصور لاختيار ملفات التحميل</string>
                 <key>NSPhotoLibraryAddUsageDescription</key>
                 <string>يتيح هذا الإذن حفظ الصور بعد اختيارها</string>
+                <key>NSLocationWhenInUseUsageDescription</key>
+                <string>يحتاج التطبيق إلى الوصول للموقع لتحديد عنوان المكتب تلقائياً</string>
+                <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+                <string>يحتاج التطبيق إلى الوصول للموقع لتحديد عنوان المكتب تلقائياً</string>
         </dict>
 </plist>

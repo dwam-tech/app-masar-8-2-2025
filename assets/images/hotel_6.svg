@@ -1,0 +1,105 @@
+<svg width="300" height="200" viewBox="0 0 300 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="skyGradient6" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFE4B5;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FFEFD5;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="buildingGradient6" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#F5F5DC;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#D2B48C;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="300" height="200" fill="url(#skyGradient6)"/>
+  
+  <!-- Main Building -->
+  <rect x="50" y="70" width="200" height="130" fill="url(#buildingGradient6)" stroke="#BC9A6A" stroke-width="2"/>
+  
+  <!-- Classical Columns -->
+  <rect x="80" y="120" width="8" height="80" fill="#F5F5DC" stroke="#D2B48C" stroke-width="1"/>
+  <rect x="110" y="120" width="8" height="80" fill="#F5F5DC" stroke="#D2B48C" stroke-width="1"/>
+  <rect x="140" y="120" width="8" height="80" fill="#F5F5DC" stroke="#D2B48C" stroke-width="1"/>
+  <rect x="170" y="120" width="8" height="80" fill="#F5F5DC" stroke="#D2B48C" stroke-width="1"/>
+  <rect x="200" y="120" width="8" height="80" fill="#F5F5DC" stroke="#D2B48C" stroke-width="1"/>
+  <rect x="230" y="120" width="8" height="80" fill="#F5F5DC" stroke="#D2B48C" stroke-width="1"/>
+  
+  <!-- Column Capitals -->
+  <rect x="78" y="115" width="12" height="8" fill="#E6E6FA" stroke="#D2B48C" stroke-width="1"/>
+  <rect x="108" y="115" width="12" height="8" fill="#E6E6FA" stroke="#D2B48C" stroke-width="1"/>
+  <rect x="138" y="115" width="12" height="8" fill="#E6E6FA" stroke="#D2B48C" stroke-width="1"/>
+  <rect x="168" y="115" width="12" height="8" fill="#E6E6FA" stroke="#D2B48C" stroke-width="1"/>
+  <rect x="198" y="115" width="12" height="8" fill="#E6E6FA" stroke="#D2B48C" stroke-width="1"/>
+  <rect x="228" y="115" width="12" height="8" fill="#E6E6FA" stroke="#D2B48C" stroke-width="1"/>
+  
+  <!-- Pediment -->
+  <polygon points="40,115 150,60 260,115" fill="#E6E6FA" stroke="#D2B48C" stroke-width="2"/>
+  
+  <!-- Upper Floor Windows -->
+  <rect x="70" y="85" width="20" height="25" fill="#4682B4" stroke="#2F4F4F" stroke-width="2"/>
+  <rect x="100" y="85" width="20" height="25" fill="#4682B4" stroke="#2F4F4F" stroke-width="2"/>
+  <rect x="130" y="85" width="20" height="25" fill="#4682B4" stroke="#2F4F4F" stroke-width="2"/>
+  <rect x="160" y="85" width="20" height="25" fill="#4682B4" stroke="#2F4F4F" stroke-width="2"/>
+  <rect x="190" y="85" width="20" height="25" fill="#4682B4" stroke="#2F4F4F" stroke-width="2"/>
+  <rect x="220" y="85" width="20" height="25" fill="#4682B4" stroke="#2F4F4F" stroke-width="2"/>
+  
+  <!-- Window Arches -->
+  <path d="M70,85 Q80,75 90,85" fill="none" stroke="#2F4F4F" stroke-width="2"/>
+  <path d="M100,85 Q110,75 120,85" fill="none" stroke="#2F4F4F" stroke-width="2"/>
+  <path d="M130,85 Q140,75 150,85" fill="none" stroke="#2F4F4F" stroke-width="2"/>
+  <path d="M160,85 Q170,75 180,85" fill="none" stroke="#2F4F4F" stroke-width="2"/>
+  <path d="M190,85 Q200,75 210,85" fill="none" stroke="#2F4F4F" stroke-width="2"/>
+  <path d="M220,85 Q230,75 240,85" fill="none" stroke="#2F4F4F" stroke-width="2"/>
+  
+  <!-- Grand Entrance -->
+  <rect x="130" y="160" width="40" height="40" fill="#8B4513" stroke="#654321" stroke-width="2"/>
+  <path d="M130,160 Q150,140 170,160" fill="#A0522D" stroke="#654321" stroke-width="2"/>
+  
+  <!-- Double Doors -->
+  <rect x="135" y="170" width="15" height="30" fill="#654321" stroke="#4A2C17" stroke-width="1"/>
+  <rect x="150" y="170" width="15" height="30" fill="#654321" stroke="#4A2C17" stroke-width="1"/>
+  
+  <!-- Door Handles -->
+  <circle cx="147" cy="185" r="1.5" fill="#FFD700"/>
+  <circle cx="153" cy="185" r="1.5" fill="#FFD700"/>
+  
+  <!-- Steps -->
+  <rect x="120" y="195" width="60" height="5" fill="#D2B48C" stroke="#BC9A6A" stroke-width="1"/>
+  <rect x="115" y="190" width="70" height="5" fill="#D2B48C" stroke="#BC9A6A" stroke-width="1"/>
+  <rect x="110" y="185" width="80" height="5" fill="#D2B48C" stroke="#BC9A6A" stroke-width="1"/>
+  
+  <!-- Hotel Sign -->
+  <rect x="90" y="30" width="120" height="25" fill="#8B0000" stroke="#654321" stroke-width="2" rx="5"/>
+  <text x="150" y="47" text-anchor="middle" fill="#FFD700" font-family="serif" font-size="14" font-weight="bold">PALACE HOTEL</text>
+  
+  <!-- Decorative Elements -->
+  <circle cx="150" cy="90" r="8" fill="#FFD700" stroke="#DAA520" stroke-width="2"/>
+  <polygon points="150,85 152,90 157,90 153,93 155,98 150,95 145,98 147,93 143,90 148,90" fill="#8B0000"/>
+  
+  <!-- Ornamental Urns -->
+  <ellipse cx="30" cy="180" rx="8" ry="12" fill="#D2B48C" stroke="#BC9A6A" stroke-width="2"/>
+  <rect x="26" y="175" width="8" height="5" fill="#BC9A6A"/>
+  <ellipse cx="30" cy="165" rx="6" ry="8" fill="#32CD32"/>
+  
+  <ellipse cx="270" cy="180" rx="8" ry="12" fill="#D2B48C" stroke="#BC9A6A" stroke-width="2"/>
+  <rect x="266" y="175" width="8" height="5" fill="#BC9A6A"/>
+  <ellipse cx="270" cy="165" rx="6" ry="8" fill="#32CD32"/>
+  
+  <!-- Fountain -->
+  <circle cx="150" cy="140" r="15" fill="#87CEEB" stroke="#4682B4" stroke-width="2"/>
+  <circle cx="150" cy="140" r="8" fill="#4682B4"/>
+  <circle cx="150" cy="135" r="2" fill="white" opacity="0.8"/>
+  <circle cx="148" cy="138" r="1" fill="white" opacity="0.6"/>
+  <circle cx="152" cy="137" r="1" fill="white" opacity="0.6"/>
+  
+  <!-- Classical Statues (simplified) -->
+  <rect x="95" y="125" width="4" height="15" fill="#F5F5DC"/>
+  <circle cx="97" cy="122" r="3" fill="#F5F5DC"/>
+  
+  <rect x="205" y="125" width="4" height="15" fill="#F5F5DC"/>
+  <circle cx="207" cy="122" r="3" fill="#F5F5DC"/>
+  
+  <!-- Birds -->
+  <path d="M80,50 Q85,45 90,50 Q85,55 80,50" fill="#696969" stroke="#2F4F4F" stroke-width="1"/>
+  <path d="M210,40 Q215,35 220,40 Q215,45 210,40" fill="#696969" stroke="#2F4F4F" stroke-width="1"/>
+</svg>

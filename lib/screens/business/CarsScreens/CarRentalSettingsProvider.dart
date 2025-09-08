@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:saba2v2/providers/auth_provider.dart';
+import 'package:saba2v2/providers/conversation_provider.dart';
 
 class CarRentalSettingsProvider extends StatefulWidget {
   const CarRentalSettingsProvider({super.key});
@@ -12,6 +15,14 @@ class CarRentalSettingsProvider extends StatefulWidget {
 
 class _CarRentalSettingsProviderState extends State<CarRentalSettingsProvider> {
   bool isArabic = true; // متغير لتتبع اللغة الحالية
+
+  Future<void> _logout(BuildContext context) async {
+    final conversationProvider = context.read<ConversationProvider>();
+    await context.read<AuthProvider>().logout(conversationProvider);
+    if (context.mounted) {
+      context.go('/login');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -176,15 +187,11 @@ class _CarRentalSettingsProviderState extends State<CarRentalSettingsProvider> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: () => context.go("/login"),
-                          icon: const Icon(Icons.logout,
-                              color: Colors.white, size: 20),
+                          onPressed: () => _logout(context),
+                          icon: const Icon(Icons.logout, color: Colors.white, size: 20),
                           label: const Text(
                             "تسجيل الخروج",
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: Colors.white),
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.orange,

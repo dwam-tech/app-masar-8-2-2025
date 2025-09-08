@@ -1,4 +1,9 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -18,43 +23,77 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
-  void _sendResetCode() async {
+  Future<void> _sendResetCode() async {
+    FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
-      // هنا يتم إرسال طلب استرجاع كلمة المرور إلى الخادم
-      await Future.delayed(const Duration(seconds: 2)); // محاكاة طلب الشبكة
-      
-      if (mounted) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final email = _emailController.text.trim();
+
+      final result = await authProvider.sendPasswordResetOtp(email: email);
+
+      if (result['status'] == true) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('تم إرسال رمز التأكيد بنجاح'),
+            content: Text('تم إرسال كود إعادة تعيين كلمة المرور بنجاح'),
             backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
           ),
         );
-        
-        // التنقل إلى شاشة إدخال رمز التأكيد
-        // Navigator.push(context, MaterialPageRoute(builder: (context) => VerificationCodeScreen()));
-      }
-    } catch (e) {
-      if (mounted) {
+        context.goNamed('otpVerification', extra: {'email': email, 'purpose': 'password_reset'});
+      } else {
+        final message = result['message'] ?? 'فشل إرسال كود إعادة التعيين';
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('حدث خطأ: $e'),
+            content: Text(message),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
           ),
         );
       }
+    } on SocketException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('لا يوجد اتصال بالإنترنت. يرجى التحقق من الاتصال والمحاولة مرة أخرى'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
+    } on TimeoutException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('انتهت مهلة الاتصال. يرجى المحاولة مرة أخرى'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
+    } on FormatException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('خطأ في تنسيق البيانات المستلمة من الخادم'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('حدث خطأ أثناء إرسال كود إعادة التعيين. يرجى المحاولة لاحقًا'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -116,19 +155,58 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             const SizedBox(height: 32),
                             TextFormField(
                               controller: _emailController,
-                              keyboardType: TextInputType.phone,
+                              keyboardType: TextInputType.emailAddress,
                               textAlign: TextAlign.right,
+                              textDirection: TextDirection.ltr,
                               decoration: InputDecoration(
-                                labelText: 'رقم الهاتف',
+                                labelText: 'البريد الإلكتروني أو رقم الهاتف',
+                                prefixIcon: Icon(Icons.email_outlined, color: Colors.grey[600]),
                                 border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: Colors.grey[300]!),
                                 ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: Colors.grey[300]!),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(color: Colors.orange, width: 2),
+                                ),
+                                errorBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(color: Colors.red),
+                                ),
+                                filled: true,
+                                fillColor: Colors.white,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                               ),
                               validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'الرجاء إدخال رقم الهاتف';
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'الرجاء إدخال البريد الإلكتروني أو رقم الهاتف';
                                 }
-                                return null;
+                                
+                                final trimmedValue = value.trim();
+                                
+                                // التحقق من صحة البريد الإلكتروني
+                                final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4} ');
+                                if (emailRegex.hasMatch(trimmedValue)) {
+                                  return null; // بريد إلكتروني صحيح
+                                }
+                                
+                                // التحقق من صحة رقم الهاتف المصري
+                                final cleanPhone = trimmedValue.replaceAll(RegExp(r'[\s\-\(\)]'), '');
+                                final phoneRegex = RegExp(r'^(010|011|012|015)\d{8}$');
+                                final phoneWithCountryCode = RegExp(r'^(\+2010|\+2011|\+2012|\+2015)\d{8}$');
+                                final phoneWithZeros = RegExp(r'^(0020010|0020011|0020012|0020015)\d{8}$');
+                                
+                                if (phoneRegex.hasMatch(cleanPhone) || 
+                                    phoneWithCountryCode.hasMatch(cleanPhone) || 
+                                    phoneWithZeros.hasMatch(cleanPhone)) {
+                                  return null; // رقم هاتف صحيح
+                                }
+                                
+                                return 'الرجاء إدخال بريد إلكتروني أو رقم هاتف مصري صحيح';
                               },
                             ),
                             const SizedBox(height: 24),

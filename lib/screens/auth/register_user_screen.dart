@@ -85,14 +85,11 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
     if (password.length < 8) {
       return 'كلمة المرور يجب أن تكون 8 أحرف على الأقل';
     }
-    if (!RegExp(r'[A-Z]').hasMatch(password)) {
-      return 'كلمة المرور يجب أن تحتوي على حرف كبير واحد على الأقل';
-    }
-    if (!RegExp(r'[a-z]').hasMatch(password)) {
-      return 'كلمة المرور يجب أن تحتوي على حرف صغير واحد على الأقل';
-    }
-    if (!RegExp(r'[0-9]').hasMatch(password)) {
-      return 'كلمة المرور يجب أن تحتوي على رقم واحد على الأقل';
+    // التحقق من وجود أرقام وحروف
+    final hasLetters = RegExp(r'[a-zA-Zأ-ي]').hasMatch(password);
+    final hasNumbers = RegExp(r'[0-9]').hasMatch(password);
+    if (!hasLetters || !hasNumbers) {
+      return 'كلمة المرور يجب أن تحتوي على أرقام وحروف';
     }
     return null;
   }
@@ -105,32 +102,48 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
           message,
           textAlign: TextAlign.right,
           textDirection: TextDirection.rtl,
+          maxLines: 5,
+          overflow: TextOverflow.visible,
         ),
-        backgroundColor: isError ? Colors.red : Colors.green,
+        backgroundColor: isError ? Colors.red[600] : Colors.green[600],
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
         ),
+        duration: Duration(seconds: isError ? 5 : 3),
       ),
     );
   }
 
   // تسجيل المستخدم
   Future<void> _register() async {
+    // إزالة التركيز من الحقول
+    FocusScope.of(context).unfocus();
+    
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
+    // التحقق من تطابق كلمات المرور
     if (_passwordController.text != _confirmPasswordController.text) {
       _showMessage('كلمتا المرور غير متطابقتين', isError: true);
       return;
     }
 
+    // التحقق من الموافقة على الشروط
     if (!_acceptTerms) {
       _showMessage('يجب الموافقة على الشروط والأحكام', isError: true);
       return;
     }
+
+    // التحقق من اختيار المحافظة
+    if (_selectedCity == null || _selectedCity!.isEmpty) {
+      _showMessage('الرجاء اختيار المحافظة', isError: true);
+      return;
+    }
+
+    if (!mounted) return;
 
     setState(() {
       _isLoading = true;
@@ -138,25 +151,59 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // التحقق من أن AuthProvider متاح
+      if (authProvider == null) {
+        throw Exception('خدمة المصادقة غير متاحة');
+      }
+      
       final result = await authProvider.registerNormalUser(
         name: _nameController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text,
         phone: _phoneController.text.trim(),
         governorate: _selectedCity!,
-        
       );
 
-      if (result['status']) {
-        _showMessage('تم إكمال تسجيل الحساب بنجاح');
+      if (!mounted) return;
+
+      // التحقق من صحة الاستجابة
+      if (result == null) {
+        _showMessage('لم يتم الحصول على استجابة من السيرفر', isError: true);
+        return;
+      }
+
+      if (result['status'] == true) {
+        _showMessage('تم إنشاء الحساب بنجاح! يرجى التحقق من بريدك الإلكتروني.');
         if (mounted) {
-          context.go('/UserHomeScreen'); // Navigate to home screen after successful registration
+          context.go('/otp-verification', extra: _emailController.text);
         }
       } else {
-        _showMessage(result['message'], isError: true);
+        String errorMessage = 'حدث خطأ أثناء إنشاء الحساب';
+        if (result['message'] != null && result['message'].toString().isNotEmpty) {
+          errorMessage = result['message'].toString();
+        }
+        _showMessage(errorMessage, isError: true);
       }
+    } on Exception catch (e) {
+      debugPrint('Registration Exception: $e');
+      String errorMessage = e.toString().replaceFirst('Exception: ', '');
+      
+      // تحسين رسائل الخطأ للبيانات المكررة
+      if (errorMessage.contains('email') || errorMessage.contains('البريد الإلكتروني')) {
+        errorMessage = 'البريد الإلكتروني مستخدم بالفعل. الرجاء استخدام بريد إلكتروني مختلف.';
+      } else if (errorMessage.contains('phone') || errorMessage.contains('رقم الهاتف')) {
+        errorMessage = 'رقم الهاتف مستخدم بالفعل. الرجاء استخدام رقم هاتف مختلف.';
+      } else if (errorMessage.contains('name') || errorMessage.contains('الاسم')) {
+        errorMessage = 'الاسم مستخدم بالفعل. الرجاء استخدام اسم مختلف.';
+      } else if (errorMessage.contains('duplicate') || errorMessage.contains('مكرر')) {
+        errorMessage = 'البيانات المدخلة مستخدمة بالفعل. الرجاء التحقق من الاسم، البريد الإلكتروني، ورقم الهاتف.';
+      }
+      
+      _showMessage(errorMessage, isError: true);
     } catch (e) {
-      _showMessage('حدث خطأ أثناء إنشاء الحساب: $e', isError: true);
+      debugPrint('Registration Error: $e');
+      _showMessage('حدث خطأ أثناء إنشاء الحساب. يرجى التحقق من الاتصال بالإنترنت والمحاولة لاحقًا', isError: true);
     } finally {
       if (mounted) {
         setState(() {
@@ -258,6 +305,13 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
         }
         if (value.trim().length < 2) {
           return 'الاسم يجب أن يحتوي على حرفين على الأقل';
+        }
+        if (value.trim().length > 50) {
+          return 'الاسم يجب أن يكون أقل من 50 حرف';
+        }
+        // التحقق من أن الاسم يحتوي على أحرف فقط
+        if (!RegExp(r'^[\u0600-\u06FFa-zA-Z\s]+$').hasMatch(value.trim())) {
+          return 'الاسم يجب أن يحتوي على أحرف فقط';
         }
         return null;
       },

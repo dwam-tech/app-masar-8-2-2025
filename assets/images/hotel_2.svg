@@ -1,0 +1,74 @@
+<svg width="300" height="200" viewBox="0 0 300 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="skyGradient2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFB6C1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FFF0F5;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="buildingGradient2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#F0E68C;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#DAA520;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="300" height="200" fill="url(#skyGradient2)"/>
+  
+  <!-- Main Building -->
+  <rect x="40" y="50" width="220" height="150" fill="url(#buildingGradient2)" stroke="#B8860B" stroke-width="2"/>
+  
+  <!-- Balconies -->
+  <rect x="60" y="90" width="40" height="15" fill="#CD853F" stroke="#8B4513" stroke-width="1"/>
+  <rect x="120" y="90" width="40" height="15" fill="#CD853F" stroke="#8B4513" stroke-width="1"/>
+  <rect x="180" y="90" width="40" height="15" fill="#CD853F" stroke="#8B4513" stroke-width="1"/>
+  
+  <rect x="60" y="130" width="40" height="15" fill="#CD853F" stroke="#8B4513" stroke-width="1"/>
+  <rect x="120" y="130" width="40" height="15" fill="#CD853F" stroke="#8B4513" stroke-width="1"/>
+  <rect x="180" y="130" width="40" height="15" fill="#CD853F" stroke="#8B4513" stroke-width="1"/>
+  
+  <!-- Windows with curtains -->
+  <rect x="65" y="70" width="30" height="25" fill="#87CEEB" stroke="#4682B4" stroke-width="2"/>
+  <rect x="65" y="70" width="15" height="25" fill="#FFE4E1" opacity="0.7"/>
+  
+  <rect x="125" y="70" width="30" height="25" fill="#87CEEB" stroke="#4682B4" stroke-width="2"/>
+  <rect x="140" y="70" width="15" height="25" fill="#FFE4E1" opacity="0.7"/>
+  
+  <rect x="185" y="70" width="30" height="25" fill="#87CEEB" stroke="#4682B4" stroke-width="2"/>
+  <rect x="185" y="70" width="15" height="25" fill="#FFE4E1" opacity="0.7"/>
+  
+  <rect x="65" y="110" width="30" height="25" fill="#87CEEB" stroke="#4682B4" stroke-width="2"/>
+  <rect x="65" y="110" width="15" height="25" fill="#FFE4E1" opacity="0.7"/>
+  
+  <rect x="125" y="110" width="30" height="25" fill="#87CEEB" stroke="#4682B4" stroke-width="2"/>
+  <rect x="140" y="110" width="15" height="25" fill="#FFE4E1" opacity="0.7"/>
+  
+  <rect x="185" y="110" width="30" height="25" fill="#87CEEB" stroke="#4682B4" stroke-width="2"/>
+  <rect x="185" y="110" width="15" height="25" fill="#FFE4E1" opacity="0.7"/>
+  
+  <!-- Grand Entrance -->
+  <rect x="120" y="160" width="60" height="40" fill="#8B4513" stroke="#654321" stroke-width="2"/>
+  <path d="M120,160 Q150,140 180,160" fill="#654321" stroke="#4A2C17" stroke-width="2"/>
+  
+  <!-- Double Doors -->
+  <rect x="130" y="170" width="18" height="30" fill="#A0522D" stroke="#654321" stroke-width="1"/>
+  <rect x="152" y="170" width="18" height="30" fill="#A0522D" stroke="#654321" stroke-width="1"/>
+  <circle cx="145" cy="185" r="1.5" fill="#FFD700"/>
+  <circle cx="155" cy="185" r="1.5" fill="#FFD700"/>
+  
+  <!-- Hotel Sign -->
+  <rect x="90" y="25" width="120" height="30" fill="#DC143C" stroke="#B22222" stroke-width="2" rx="8"/>
+  <text x="150" y="45" text-anchor="middle" fill="white" font-family="Arial" font-size="16" font-weight="bold">GRAND HOTEL</text>
+  
+  <!-- Decorative Elements -->
+  <circle cx="20" cy="170" r="12" fill="#32CD32"/>
+  <circle cx="20" cy="170" r="8" fill="#228B22"/>
+  <circle cx="20" cy="170" r="4" fill="#006400"/>
+  
+  <circle cx="280" cy="170" r="12" fill="#32CD32"/>
+  <circle cx="280" cy="170" r="8" fill="#228B22"/>
+  <circle cx="280" cy="170" r="4" fill="#006400"/>
+  
+  <!-- Stars -->
+  <polygon points="150,10 152,16 158,16 153,20 155,26 150,22 145,26 147,20 142,16 148,16" fill="#FFD700"/>
+  <polygon points="170,15 171,18 174,18 172,20 173,23 170,21 167,23 168,20 166,18 169,18" fill="#FFD700"/>
+  <polygon points="130,15 131,18 134,18 132,20 133,23 130,21 127,23 128,20 126,18 129,18" fill="#FFD700"/>
+</svg>

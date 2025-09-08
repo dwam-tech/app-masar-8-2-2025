@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:saba2v2/components/UI/custom_text_field.dart';
-import 'package:saba2v2/components/UI/radio_group.dart';
+import 'package:saba2v2/components/UI/radio_group.dart' as custom;
 import 'package:saba2v2/components/UI/action_row.dart';
 import 'package:saba2v2/components/UI/custom_dropdown_field.dart';
 import 'package:saba2v2/components/UI/section_title.dart';
@@ -69,7 +69,7 @@ class _AddNewStateScreenState extends State<AddNewStateScreen> {
             const CustomTextField(hintText: 'رقم الوحدة', isNumeric: true),
             const Divider(height: 32, thickness: 1),
 
-            RadioGroup<PropertyType>(
+            custom.RadioGroup<PropertyType>(
               title: 'قم بتحديد نوع العقار',
               options: const {
                 PropertyType.villa: 'فيلا',
@@ -81,7 +81,7 @@ class _AddNewStateScreenState extends State<AddNewStateScreen> {
             ),
             const Divider(height: 32, thickness: 1),
 
-            RadioGroup<PropertyStatus>(
+            custom.RadioGroup<PropertyStatus>(
               title: 'حالة العقار',
               options: const {
                 PropertyStatus.forSale: 'جاهز للبيع',
@@ -93,7 +93,7 @@ class _AddNewStateScreenState extends State<AddNewStateScreen> {
             ),
             const Divider(height: 32, thickness: 1),
 
-            RadioGroup<FinishingStatus>(
+            custom.RadioGroup<FinishingStatus>(
               title: 'حالة التشطيب',
               options: const {
                 FinishingStatus.newFinish: 'جديد',

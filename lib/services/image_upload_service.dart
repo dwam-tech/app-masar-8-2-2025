@@ -5,9 +5,10 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:saba2v2/services/auth_service.dart';
 import 'package:http/http.dart' as http;
+import '../config/constants.dart';
 
 class ImageUploadService {
-  final String _baseUrl = 'http://192.168.1.7:8000';
+  final String _baseUrl = AppConstants.baseUrl;
   final AuthService _authService = AuthService();
 
   /// ترفع ملف صورة إلى السيرفر وتعيد رابط الصورة كنص

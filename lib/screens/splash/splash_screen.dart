@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:saba2v2/providers/auth_provider.dart';
+import 'package:saba2v2/main.dart' show hookTokenRefresh;
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -28,6 +29,15 @@ class _SplashScreenState extends State<SplashScreen> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     
     if (authProvider.isLoggedIn && authProvider.userData != null) {
+      // FCM: ربط تحديث Token للمستخدمين المسجلين
+      try {
+        if (authProvider.token != null) {
+          hookTokenRefresh(authProvider.token!);
+        }
+      } catch (e) {
+        debugPrint('[FCM] Failed to hook token refresh on app start: $e');
+      }
+      
       // إذا كان المستخدم مسجل دخول، توجيهه إلى الصفحة المناسبة حسب نوع المستخدم
       final userType = authProvider.userType;
       

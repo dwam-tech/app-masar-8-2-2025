@@ -1,11 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/conversation_provider.dart';
+import '../providers/conversations_provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/message_model.dart';
+import '../services/conversations_service.dart';
+import '../utils/app_colors.dart';
+import '../utils/app_text_styles.dart';
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  final String? conversationId;
+  final String? conversationTitle;
+  final bool isSupportChat;
+
+  const ChatScreen({
+    super.key,
+    this.conversationId,
+    this.conversationTitle,
+    this.isSupportChat = false,
+  });
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -14,13 +27,15 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  
   @override
   void initState() {
     super.initState();
     
     // إضافة listener لتتبع الكتابة
     _messageController.addListener(_onTextChanged);
+    
+    // إضافة listener للتمرير لتحميل المزيد من الرسائل
+    _scrollController.addListener(_onScroll);
     
     // التحقق من التهيئة وجلب المحادثة
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -37,20 +52,25 @@ class _ChatScreenState extends State<ChatScreen> {
     provider.setUserTyping(isTyping);
   }
 
+  void _onScroll() {
+    // تحميل المزيد من الرسائل عند الوصول لأعلى القائمة (80% من الطريق)
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent * 0.8) {
+      final provider = context.read<ConversationProvider>();
+      if (provider.hasMoreMessages && !provider.isLoadingMoreMessages) {
+        provider.loadMoreMessages();
+      }
+    }
+  }
+
   void _ensureInitialized() {
-    debugPrint('🚀 ChatScreen: _ensureInitialized called');
-    
+   
     final authProvider = context.read<AuthProvider>();
     final conversationProvider = context.read<ConversationProvider>();
     
-    debugPrint('🔐 Auth status: ${authProvider.isLoggedIn}');
-    debugPrint('💬 Conversation initialized: ${conversationProvider.isInitialized}');
-    
+  
     // التحقق من تسجيل الدخول وتهيئة ConversationProvider إذا لم يكن مُهيأ
     if (authProvider.isLoggedIn && !conversationProvider.isInitialized) {
-      debugPrint('🔧 Initializing ConversationProvider...');
-      debugPrint('   - Token: ${authProvider.token != null ? "Available" : "Missing"}');
-      debugPrint('   - User ID: ${authProvider.userData?['id']}');
+      
       
       conversationProvider.initialize(
         authProvider.token!,
@@ -58,23 +78,47 @@ class _ChatScreenState extends State<ChatScreen> {
       );
     }
     
-    // Always fetch conversation data when screen loads
+    // جلب بيانات المحادثة بناءً على النوع
     if (conversationProvider.isInitialized) {
-      debugPrint('📞 Calling fetchConversation...');
-      conversationProvider.fetchConversation();
+      if (widget.isSupportChat) {
+        conversationProvider.fetchConversation();
+      } else if (widget.conversationId != null) {
+        _loadSpecificConversation();
+      } else {
+        conversationProvider.fetchConversation();
+      }
     } else {
-      debugPrint('❌ ConversationProvider not initialized, cannot fetch conversation');
+    }
+  }
+  
+  void _loadSpecificConversation() async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final response = await ConversationsService.getConversationMessages(
+        token: authProvider.token ?? '',
+        conversationId: int.parse(widget.conversationId!),
+      );
+      
+      if (response != null && response.messages != null) {
+        final conversationProvider = context.read<ConversationProvider>();
+        // يمكن إضافة منطق لتحميل الرسائل في المزود
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading conversation messages: $e');
     }
   }
 
   @override
   void dispose() {
-    // إشعار المزود بخروج شاشة الشات
+    _messageController.removeListener(_onTextChanged);
+    _scrollController.removeListener(_onScroll);
+    _messageController.dispose();
+    _scrollController.dispose();
+    
+    // إشعار المزود بالخروج من شاشة الشات
     final conversationProvider = context.read<ConversationProvider>();
     conversationProvider.exitChatScreen();
     
-    _messageController.dispose();
-    _scrollController.dispose();
     super.dispose();
   }
 
@@ -123,13 +167,9 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildMessagesArea(ConversationProvider provider) {
-    debugPrint('🎨 Building messages area...');
-    debugPrint('   - Is loading: ${provider.isLoading}');
-    debugPrint('   - Messages count: ${provider.messages.length}');
-    debugPrint('   - Error: ${provider.error}');
+   
     
     if (provider.isLoading && provider.messages.isEmpty) {
-      debugPrint('⏳ Showing loading indicator');
       return const Center(
         child: CircularProgressIndicator(
           color: Color(0xFF2E7D32),
@@ -172,7 +212,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     if (provider.messages.isEmpty) {
-      debugPrint('📭 Showing empty state');
       return const Center(
         child: Text(
           'لا توجد رسائل\nابدأ المحادثة بإرسال رسالة',
@@ -185,19 +224,35 @@ class _ChatScreenState extends State<ChatScreen> {
       );
     }
 
-    debugPrint('📝 Building ListView with ${provider.messages.length} messages');
+    
+    // عدد العناصر = الرسائل + مؤشر التحميل (إذا كان هناك المزيد)
+    final itemCount = provider.messages.length + (provider.hasMoreMessages ? 1 : 0);
+    
     return ListView.builder(
       controller: _scrollController,
       reverse: true, // الرسائل الأحدث في الأسفل
       padding: const EdgeInsets.all(16),
-      itemCount: provider.messages.length,
+      itemCount: itemCount,
       itemBuilder: (context, index) {
+        // إذا كان هذا هو العنصر الأخير وهناك المزيد من الرسائل، اعرض مؤشر التحميل
+        if (index == provider.messages.length && provider.hasMoreMessages) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            alignment: Alignment.center,
+            child: provider.isLoadingMoreMessages
+                ? const CircularProgressIndicator()
+                : const Text(
+                    'اسحب لأعلى لتحميل المزيد من الرسائل',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+          );
+        }
+        
         // الرسائل مرتبة بالعكس، لذا نحتاج لعكس الفهرس
         final messageIndex = provider.messages.length - 1 - index;
         final message = provider.messages[messageIndex];
         final isMyMessage = provider.isMyMessage(message);
 
-        debugPrint('   Building message $messageIndex: sender=${message.senderId}, isMyMessage=$isMyMessage');
 
         return _MessageBubble(
           message: message,

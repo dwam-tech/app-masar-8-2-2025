@@ -60,7 +60,7 @@ class _DeliveryRegistrationScreenState extends State<DeliveryRegistrationScreen>
               const Align(
                 alignment: Alignment.centerRight,
                 child: Text(
-                  'نوعية صاحب العقار',
+                  'اختر نوع الحساب',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,

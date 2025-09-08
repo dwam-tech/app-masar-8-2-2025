@@ -161,6 +161,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   Widget build(BuildContext context) {
     final Size screenSize = MediaQuery.of(context).size;
     final bool isTablet = screenSize.width > 600;
+    final bool isLandscape = screenSize.width > screenSize.height;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
@@ -194,6 +195,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 return OnboardingPage(
                   screenSize: screenSize,
                   isTablet: isTablet,
+                  isLandscape: isLandscape,
                   title: data['title']!,
                   description: data['description']!,
                   imageUrl: data['image']!,
@@ -260,6 +262,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 class OnboardingPage extends StatelessWidget {
   final Size screenSize;
   final bool isTablet;
+  final bool isLandscape;
   final String title;
   final String description;
   final String imageUrl;
@@ -277,6 +280,7 @@ class OnboardingPage extends StatelessWidget {
     super.key,
     required this.screenSize,
     required this.isTablet,
+    required this.isLandscape,
     required this.title,
     required this.description,
     required this.imageUrl,
@@ -293,6 +297,14 @@ class OnboardingPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (isLandscape) {
+      return _buildLandscapeLayout();
+    } else {
+      return _buildPortraitLayout();
+    }
+  }
+
+  Widget _buildPortraitLayout() {
     final width = screenSize.width * (isTablet ? 0.7 : 0.88);
     final imageHeight = screenSize.height * (isTablet ? 0.33 : 0.28);
 
@@ -416,7 +428,6 @@ class OnboardingPage extends StatelessWidget {
                   ),
                   // Next Button (responsive position)
                   Positioned(
-
                     left: 0,
                     right: 0,
                     bottom: screenSize.height * 0.18,
@@ -475,6 +486,168 @@ class OnboardingPage extends StatelessWidget {
                 ],
               );
             },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLandscapeLayout() {
+    final contentWidth = screenSize.width * 0.85;
+    final contentHeight = screenSize.height * 0.8;
+    final imageSize = contentHeight * 0.5;
+
+    return Center(
+      child: SlideTransition(
+        position: slideAnim,
+        child: FadeTransition(
+          opacity: fadeAnim,
+          child: Container(
+            width: contentWidth,
+            height: contentHeight,
+            padding: EdgeInsets.symmetric(
+              horizontal: isTablet ? 20 : 10,
+              vertical: isTablet ? 20 : 10,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Image Section
+                Expanded(
+                  flex: 4,
+                  child: Center(
+                    child: Hero(
+                      tag: 'onboarding_image_$currentPage',
+                      child: Image.asset(
+                        imageUrl,
+                        width: imageSize,
+                        height: imageSize,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                ),
+                
+                // Content Section
+                Expanded(
+                  flex: 5,
+                  child: Container(
+                    margin: EdgeInsets.only(left: isTablet ? 30 : 20),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AnimatedDefaultTextStyle(
+                          duration: const Duration(milliseconds: 300),
+                          style: TextStyle(
+                            fontSize: isTablet ? 24 : 20,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF0D0700),
+                          ),
+                          child: Text(
+                            title,
+                            textAlign: TextAlign.start,
+                          ),
+                        ),
+                        SizedBox(height: isTablet ? 12 : 8),
+                        AnimatedDefaultTextStyle(
+                          duration: const Duration(milliseconds: 300),
+                          style: TextStyle(
+                            fontSize: isTablet ? 16 : 14,
+                            color: const Color(0xFF5D554A),
+                            height: 1.4,
+                          ),
+                          child: Text(
+                            description,
+                            textAlign: TextAlign.start,
+                          ),
+                        ),
+                        SizedBox(height: isTablet ? 25 : 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          children: [
+                            FadeTransition(
+                              opacity: dotsAnim,
+                              child: Row(
+                                children: List.generate(
+                                  numPages,
+                                  (index) => AnimatedContainer(
+                                    duration: const Duration(milliseconds: 300),
+                                    curve: Curves.easeInOutCubic,
+                                    margin: EdgeInsets.symmetric(
+                                      horizontal: isTablet ? 4 : 3,
+                                    ),
+                                    height: isTablet ? 8 : 6,
+                                    width: currentPage == index
+                                        ? (isTablet ? 32 : 24)
+                                        : (isTablet ? 12 : 10),
+                                    decoration: BoxDecoration(
+                                      color: currentPage == index
+                                          ? Colors.orange
+                                          : Colors.grey.shade300,
+                                      borderRadius: BorderRadius.circular(
+                                        isTablet ? 6 : 4,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            ScaleTransition(
+                              scale: buttonAnim,
+                              child: GestureDetector(
+                                onTap: isLoading ? null : onNext,
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  width: isTablet ? 60 : 50,
+                                  height: isTablet ? 60 : 50,
+                                  decoration: BoxDecoration(
+                                    color: isLoading
+                                        ? Colors.orange.withOpacity(0.6)
+                                        : Colors.orange,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      width: isTablet ? 6 : 5,
+                                      style: BorderStyle.solid,
+                                      color: const Color(0xFFF5F5F5),
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.orange.withOpacity(0.3),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 6),
+                                      ),
+                                    ],
+                                  ),
+                                  child: isLoading
+                                      ? SizedBox(
+                                    width: isTablet ? 20 : 16,
+                                    height: isTablet ? 20 : 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                      : Icon(
+                                    isLast ? Icons.check : Icons.arrow_forward,
+                                    color: Colors.white,
+                                    size: isTablet ? 28 : 24,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

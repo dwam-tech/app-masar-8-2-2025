@@ -15,7 +15,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 // }
 
 
-const String baseUrl = 'http://192.168.1.7:8000';
+import '../config/constants.dart';
+
+const String baseUrl = AppConstants.baseUrl;
 
 class AuthService {
 final LaravelService _laravelService = LaravelService();
@@ -35,6 +37,7 @@ final LaravelService _laravelService = LaravelService();
   
 
 
+
   
 
   Future<Map<String, dynamic>> registerNormalUser({
@@ -51,6 +54,51 @@ final LaravelService _laravelService = LaravelService();
       return {'status': result['status'], 'message': result['message'], 'user': result['user']};
     } catch (e) {
       return {'status': false, 'message': e.toString().replaceFirst('Exception: ', ''), 'user': null};
+    }
+  }
+
+  /// التحقق من رمز OTP للبريد الإلكتروني
+  Future<Map<String, dynamic>> verifyEmailOtp({
+    required String email,
+    required String otp,
+  }) async {
+    print('DEBUG AuthService: verifyEmailOtp called');
+    print('DEBUG AuthService: Email: "$email"');
+    print('DEBUG AuthService: OTP: "$otp"');
+    
+    try {
+      final result = await _laravelService.verifyEmailOtp(
+        email: email,
+        otp: otp,
+      );
+      print('DEBUG AuthService: LaravelService result: $result');
+      return result;
+    } catch (e) {
+      print('DEBUG AuthService: verifyEmailOtp Exception: $e');
+      return {
+        'status': false,
+        'message': e.toString().replaceFirst('Exception: ', ''),
+      };
+    }
+  }
+
+  /// إعادة إرسال رمز OTP للبريد الإلكتروني
+  Future<Map<String, dynamic>> resendEmailOtp({
+    required String email,
+  }) async {
+    print('DEBUG AuthService: resendEmailOtp called');
+    print('DEBUG AuthService: Email: "$email"');
+    
+    try {
+      final result = await _laravelService.resendEmailOtp(email: email);
+      print('DEBUG AuthService: LaravelService resend result: $result');
+      return result;
+    } catch (e) {
+      print('DEBUG AuthService: resendEmailOtp Exception: $e');
+      return {
+        'status': false,
+        'message': e.toString().replaceFirst('Exception: ', ''),
+      };
     }
   }
 
@@ -421,9 +469,7 @@ Future<void> _saveUserData(Map<String, dynamic> userData) async {
  
 
  
-
-
- Future<Map<String, dynamic>> login({required String email, required String password}) async {
+Future<Map<String, dynamic>> login({required String email, required String password}) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/api/login'),
@@ -435,53 +481,163 @@ Future<void> _saveUserData(Map<String, dynamic> userData) async {
         final responseData = jsonDecode(response.body);
         debugPrint("AuthService: Login successful. API Response received.");
         
-        // **التصحيح الحاسم: قراءة التوكن والبيانات من المسار الصحيح**
         if (responseData['token'] != null && responseData['user'] != null) {
-          await _saveSession(
-            token: responseData['token'], // المسار الصحيح
+          // استدعاء دالة الحفظ الشاملة الجديدة
+          await saveUserDataWithToken(
+            token: responseData['token'],
             userData: responseData['user'],
           );
         }
         return {'status': true, 'message': 'Login successful', 'user': responseData['user']};
       } else {
         final errorData = jsonDecode(response.body);
-        throw Exception(errorData['message'] ?? 'Failed to login');
+        String errorMessage = errorData['message'] ?? 'فشل في تسجيل الدخول';
+        
+        // التعامل مع رموز الأخطاء المختلفة
+        if (response.statusCode == 401) {
+          throw Exception('بيانات الدخول غير صحيحة');
+        } else if (response.statusCode == 422) {
+          throw Exception('بيانات غير صالحة. يرجى التحقق من البريد الإلكتروني وكلمة المرور');
+        } else if (response.statusCode >= 500) {
+          throw Exception('خطأ في الخادم. يرجى المحاولة لاحقاً');
+        } else {
+          throw Exception(errorMessage);
+        }
       }
+    } on http.ClientException catch (e) {
+      debugPrint('AuthService: Network error during login: $e');
+      throw Exception('لا يوجد اتصال بالإنترنت. يرجى التحقق من الاتصال والمحاولة مرة أخرى');
+    } on FormatException catch (e) {
+      debugPrint('AuthService: JSON parsing error: $e');
+      throw Exception('خطأ في تنسيق البيانات المستلمة من الخادم');
     } catch (e) {
-      throw Exception('Network or server error during login: $e');
+      debugPrint('AuthService: Unexpected error during login: $e');
+      if (e.toString().contains('بيانات الدخول غير صحيحة')) {
+        throw Exception('بيانات الدخول غير صحيحة');
+      } else if (e.toString().contains('Network') || e.toString().contains('network')) {
+        throw Exception('خطأ في الشبكة. يرجى التحقق من الاتصال بالإنترنت');
+      } else {
+        throw Exception('حدث خطأ غير متوقع. يرجى المحاولة لاحقاً');
+      }
     }
   }
 
-  /// دالة حفظ الجلسة (النسخة النهائية المصححة لتطابق الـ JSON)
-  Future<void> _saveSession({required String token, required Map<String, dynamic> userData}) async {
+  /// --- [تم تعديل هذه الدالة لتكون النسخة النهائية الشاملة] ---
+  /// دالة حفظ بيانات المستخدم والتوكن وكل الـ IDs
+  Future<void> saveUserDataWithToken({required String token, required Map<String, dynamic> userData}) async {
     final prefs = await SharedPreferences.getInstance();
+
+    // 1. حفظ التوكن وبيانات المستخدم الكاملة
     await prefs.setString('token', token);
     await prefs.setString('user_data', jsonEncode(userData));
+    debugPrint("AuthService: Saved token and user_data successfully.");
+
+    // 2. تصفير الـ IDs القديمة لضمان عدم التداخل
+    await prefs.remove('car_rental_id');
+    await prefs.remove('real_estate_id');
+    await prefs.remove('restaurant_id');
     
-    await prefs.remove('entity_id'); // تصفير الـ ID القديم لضمان عدم التداخل
-    
-    // **التصحيح الحاسم: قراءة ID المطعم من المسار الصحيح**
-    int? entityId;
-    if (userData['restaurant_detail']?['id'] != null) {
-      entityId = userData['restaurant_detail']['id'];
-      debugPrint("AuthService SUCCESS: Found and saving restaurant ID: $entityId");
-    } else if (userData['real_estate']?['id'] != null) {
-      entityId = userData['real_estate']['id'];
-      debugPrint("AuthService SUCCESS: Found and saving real estate ID: $entityId");
+    // --- [هذا هو الجزء الأهم] ---
+    // 3. استخلاص وحفظ car_rental_id إذا كان موجودًا
+    if (userData['car_rental']?['id'] != null) {
+      final carRentalId = userData['car_rental']['id'];
+      await prefs.setInt('car_rental_id', carRentalId);
+      debugPrint("AuthService SUCCESS: Found and saved car_rental_id -> $carRentalId");
     }
 
-    if (entityId != null) {
-      // استخدام مفتاح موحد لحفظ ID المطعم أو العقار
-      await prefs.setInt('entity_id', entityId);
+    // 4. استخلاص وحفظ real_estate_id إذا كان موجودًا
+    if (userData['real_estate']?['id'] != null) {
+      final realEstateId = userData['real_estate']['id'];
+      await prefs.setInt('real_estate_id', realEstateId);
+      debugPrint("AuthService SUCCESS: Found and saved real_estate_id -> $realEstateId");
+    }
+    
+    // 5. استخلاص وحفظ restaurant_id إذا كان موجودًا
+    if (userData['restaurant_detail']?['id'] != null) {
+      final restaurantId = userData['restaurant_detail']['id'];
+      await prefs.setInt('restaurant_id', restaurantId);
+      debugPrint("AuthService SUCCESS: Found and saved restaurant_id -> $restaurantId");
     }
   }
+
+   Future<int?> getCarRentalId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('car_rental_id');
+  }
+
+  Future<int?> getRestaurantId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('restaurant_id');
+  }
+
+  Future<int?> getRealEstateId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('real_estate_id');
+  }
+
+ 
+
+//  Future<Map<String, dynamic>> login({required String email, required String password}) async {
+//     try {
+//       final response = await http.post(
+//         Uri.parse('$baseUrl/api/login'),
+//         headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+//         body: jsonEncode({'email': email, 'password': password}),
+//       );
+
+//       if (response.statusCode == 200) {
+//         final responseData = jsonDecode(response.body);
+//         debugPrint("AuthService: Login successful. API Response received.");
+        
+//         // **التصحيح الحاسم: قراءة التوكن والبيانات من المسار الصحيح**
+//         if (responseData['token'] != null && responseData['user'] != null) {
+//           await _saveSession(
+//             token: responseData['token'], // المسار الصحيح
+//             userData: responseData['user'],
+//           );
+//         }
+//         return {'status': true, 'message': 'Login successful', 'user': responseData['user']};
+//       } else {
+//         final errorData = jsonDecode(response.body);
+//         throw Exception(errorData['message'] ?? 'Failed to login');
+//       }
+//     } catch (e) {
+//       throw Exception('Network or server error during login: $e');
+//     }
+//   }
+
+//   /// دالة حفظ الجلسة (النسخة النهائية المصححة لتطابق الـ JSON)
+//   Future<void> _saveSession({required String token, required Map<String, dynamic> userData}) async {
+//     final prefs = await SharedPreferences.getInstance();
+//     await prefs.setString('token', token);
+//     await prefs.setString('user_data', jsonEncode(userData));
+    
+//     await prefs.remove('entity_id'); // تصفير الـ ID القديم لضمان عدم التداخل
+    
+//     // **التصحيح الحاسم: قراءة ID المطعم من المسار الصحيح**
+//     int? entityId;
+//     if (userData['restaurant_detail']?['id'] != null) {
+//       entityId = userData['restaurant_detail']['id'];
+//       debugPrint("AuthService SUCCESS: Found and saving restaurant ID: $entityId");
+//     } else if (userData['real_estate']?['id'] != null) {
+//       entityId = userData['real_estate']['id'];
+//       debugPrint("AuthService SUCCESS: Found and saving real estate ID: $entityId");
+//     }
+
+//     if (entityId != null) {
+//       // استخدام مفتاح موحد لحفظ ID المطعم أو العقار
+//       await prefs.setInt('entity_id', entityId);
+//     }
+//   }
 
   /// دالة تسجيل الخروج (النسخة النهائية الصحيحة)
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('token');
     await prefs.remove('user_data');
-    await prefs.remove('entity_id');
+    await prefs.remove('car_rental_id');
+    await prefs.remove('real_estate_id');
+    await prefs.remove('restaurant_id');
     try {
       await _laravelService.logout();
     } catch (e) {
@@ -501,10 +657,7 @@ Future<void> _saveUserData(Map<String, dynamic> userData) async {
     return data != null ? jsonDecode(data) : null;
   }
 
-  Future<int?> getRealEstateId() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt('entity_id');
-  }
+
 
 
   //--------------------------------------------
@@ -538,5 +691,131 @@ Future<void> _saveUserData(Map<String, dynamic> userData) async {
       throw Exception('لا يمكن الاتصال بالخادم. يرجى التحقق من اتصالك بالإنترنت.');
     }
   }
+  Future<bool> updateCity(String newCity) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        throw Exception('المستخدم غير مسجل الدخول');
+      }
 
+      // الحصول على بيانات المستخدم للحصول على الـ ID
+      final userData = await getUserData();
+      if (userData == null || userData['id'] == null) {
+        throw Exception('لا يمكن العثور على معرف المستخدم');
+      }
+
+      final userId = userData['id'];
+      final response = await http.put(
+        Uri.parse('$baseUrl/api/users/$userId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'governorate': newCity}),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        if (responseData['status'] == true || responseData['user'] != null) {
+          // تحديث البيانات المحلية
+          userData['governorate'] = newCity;
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('user_data', jsonEncode(userData));
+          return true;
+        }
+      }
+      return false;
+    } catch (e) {
+      debugPrint('خطأ في تحديث المحافظة: $e');
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchCurrentUser() async {
+    final token = await getToken();
+    if (token == null) {
+      throw Exception("لا يمكن جلب البيانات: المستخدم غير مسجل.");
+    }
+
+    final url = Uri.parse('$baseUrl/api/user');
+    debugPrint("--- FETCHING CURRENT USER from $url ---");
+    
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
+      
+      debugPrint("Fetch current user response status: ${response.statusCode}");
+      debugPrint("Fetch current user response body: ${response.body}");
+
+      final responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        // الـ API قد يرجع البيانات مباشرة أو داخل مفتاح 'user'
+        Map<String, dynamic> userData;
+        if (responseData is Map<String, dynamic> && responseData.containsKey('user')) {
+            userData = responseData['user'];
+        } else {
+            userData = responseData;
+        }
+
+        debugPrint("!!! FETCH CURRENT USER SUCCESS !!!");
+        return userData;
+
+      } else {
+        throw Exception(responseData['message'] ?? 'فشل جلب بيانات المستخدم.');
+      }
+    } catch (e) {
+      debugPrint("!!! ERROR in fetchCurrentUser: $e !!!");
+      throw Exception("حدث خطأ في الشبكة أثناء جلب بيانات المستخدم.");
+    }
+  }
+
+  /// إرسال كود OTP لاستعادة كلمة المرور
+  Future<Map<String, dynamic>> sendPasswordResetOtp({required String email}) async {
+    print('DEBUG AuthService: sendPasswordResetOtp called');
+    try {
+      final result = await _laravelService.sendPasswordResetOtp(email: email);
+      print('DEBUG AuthService: sendPasswordResetOtp result: $result');
+      return result;
+    } catch (e) {
+      print('DEBUG AuthService: sendPasswordResetOtp exception: $e');
+      return {
+        'status': false,
+        'message': 'تعذر إرسال رمز إعادة التعيين. حاول لاحقًا',
+        'data': null,
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> resetPasswordWithOtp({
+    required String email,
+    required String otp,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    print('DEBUG AuthService: resetPasswordWithOtp called');
+    try {
+      final result = await _laravelService.resetPasswordWithOtp(
+        email: email,
+        otp: otp,
+        password: password,
+        passwordConfirmation: passwordConfirmation,
+      );
+      print('DEBUG AuthService: resetPasswordWithOtp result: $result');
+      return result;
+    } catch (e) {
+      print('DEBUG AuthService: resetPasswordWithOtp exception: $e');
+      return {
+        'status': false,
+        'message': 'تعذر إعادة تعيين كلمة المرور. حاول لاحقًا',
+        'data': null,
+      };
+    }
+  }
 }

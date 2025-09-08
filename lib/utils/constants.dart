@@ -1,3 +1,5 @@
+import '../config/constants.dart';
+
 class Constants {
-  static const String baseUrl = 'http://192.168.1.7:8000';
+static const String baseUrl = AppConstants.baseUrl;
 }

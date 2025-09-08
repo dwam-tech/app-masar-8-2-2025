@@ -10,6 +10,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
 import 'package:saba2v2/components/UI/image_picker_row.dart';
 import 'package:saba2v2/components/UI/section_title.dart';
+import '../../../config/constants.dart';
 
 // --- هذا الكلاس يبقى كما هو بدون أي تغيير ---
 class RestaurantLegalData {
@@ -93,7 +94,7 @@ class _ResturantLawDataState extends State<ResturantLawData> {
 
   Map<String, String?> _localImagePaths = {};
   
-  static const String _baseUrl = 'http://192.168.1.7:8000';
+  static const String _baseUrl = AppConstants.baseUrl;
 
   @override
   void initState() {
@@ -179,6 +180,17 @@ class _ResturantLawDataState extends State<ResturantLawData> {
         case 'vatPhotoBack': _formData = _formData.copyWith(vatPhotoBack: null); break;
       }
     });
+    
+    // إظهار تنبيه فوري عند حذف صورة مطلوبة
+    if (['profileImage', 'ownerIdFront', 'ownerIdBack', 'restaurantLicenseFront', 'restaurantLicenseBack', 'crPhotoFront', 'crPhotoBack'].contains(fieldName)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تم حذف الصورة. يجب رفع جميع الصور المطلوبة قبل المتابعة'),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   void _handleVatSelection(bool value) {
@@ -186,16 +198,47 @@ class _ResturantLawDataState extends State<ResturantLawData> {
   }
 
   void _submitForm() {
-    // التحقق من رفع الصور (الصور الخاصة بالضريبة اختيارية)
-    if (_formData.profileImage == null ||
-        _formData.ownerIdFront == null ||
-        _formData.ownerIdBack == null ||
-        _formData.restaurantLicenseFront == null ||
-        _formData.restaurantLicenseBack == null ||
-        _formData.crPhotoFront == null ||
-        _formData.crPhotoBack == null) {
+    if (_isLoading) return;
+    
+    // التحقق من الصور المطلوبة مع التحقق المزدوج
+    final missingImages = <String>[];
+    
+    if (_formData.profileImage == null || _localImagePaths['profileImage'] == null) {
+      missingImages.add('الصورة الشخصية');
+    }
+    if (_formData.ownerIdFront == null || _localImagePaths['ownerIdFront'] == null) {
+      missingImages.add('صورة الهوية الأمامية');
+    }
+    if (_formData.ownerIdBack == null || _localImagePaths['ownerIdBack'] == null) {
+      missingImages.add('صورة الهوية الخلفية');
+    }
+    if (_formData.restaurantLicenseFront == null || _localImagePaths['restaurantLicenseFront'] == null) {
+      missingImages.add('ترخيص المطعم الأمامي');
+    }
+    if (_formData.restaurantLicenseBack == null || _localImagePaths['restaurantLicenseBack'] == null) {
+      missingImages.add('ترخيص المطعم الخلفي');
+    }
+    if (_formData.crPhotoFront == null || _localImagePaths['crPhotoFront'] == null) {
+      missingImages.add('السجل التجاري الأمامي');
+    }
+    if (_formData.crPhotoBack == null || _localImagePaths['crPhotoBack'] == null) {
+      missingImages.add('السجل التجاري الخلفي');
+    }
+    
+    if (missingImages.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('الرجاء رفع كل الصور المطلوبة (باستثناء صور الضريبة)')),
+        SnackBar(
+          content: Text('الصور المطلوبة المفقودة: ${missingImages.join(', ')}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+          action: SnackBarAction(
+            label: 'موافق',
+            textColor: Colors.white,
+            onPressed: () {
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            },
+          ),
+        ),
       );
       return;
     }

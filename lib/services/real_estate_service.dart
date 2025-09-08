@@ -2,9 +2,10 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/constants.dart';
 
 class RealEstateService {
-  static const String baseUrl = 'http://192.168.1.7:8000';
+  static const String baseUrl = AppConstants.baseUrl;
 
   /// جلب بيانات المستخدم الحالية من الـ API
   Future<Map<String, dynamic>?> getCurrentUserData() async {

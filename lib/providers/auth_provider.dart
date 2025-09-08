@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:saba2v2/models/appointment_model.dart';
 import 'package:saba2v2/models/property_model.dart';
 import 'package:saba2v2/providers/conversation_provider.dart';
@@ -11,6 +12,9 @@ import 'package:saba2v2/services/auth_service.dart';
 import 'package:saba2v2/services/image_upload_service.dart';
 import 'package:saba2v2/services/property_service.dart';
 import 'package:http/http.dart' as http;
+import 'package:google_sign_in/google_sign_in.dart';
+import '../config/constants.dart';
+import '../main.dart' show registerDeviceToken, hookTokenRefresh, deleteDeviceToken;
 
 /// enum لتمثيل حالة المصادقة بشكل واضح
 enum AuthStatus {
@@ -59,6 +63,7 @@ class AuthProvider with ChangeNotifier {
   AuthStatus get authStatus => _authStatus;
   Map<String, dynamic>? get userData => _userData;
   bool get isLoggedIn => _authStatus == AuthStatus.authenticated;
+  bool get isAuthenticated => _authStatus == AuthStatus.authenticated;
   String? get token => _token;
   List<Property> get properties => _properties;
   bool get isLoading => _isLoading;
@@ -80,23 +85,71 @@ class AuthProvider with ChangeNotifier {
     await _loadUserSession();
   }
 
+  /// إعادة تحميل الجلسة يدوياً (للاستخدام في حالات الأخطاء)
+  Future<void> reloadSession() async {
+    debugPrint("=== Manual session reload requested ===");
+    await _loadUserSession();
+  }
+
   /// تحميل جلسة المستخدم من التخزين المحلي وجلب بياناته (النسخة النهائية المصححة)
   Future<void> _loadUserSession() async {
+    debugPrint("=== AuthProvider _loadUserSession Start ===");
+    
     _token = await _authService.getToken();
     _userData = await _authService.getUserData();
 
+    debugPrint("Token loaded: ${_token != null ? 'Yes' : 'No'}");
+    debugPrint("User data loaded: ${_userData != null ? 'Yes' : 'No'}");
+
     // ==========================================================
-    // --- التعديل الحاسم هنا ---
-    // بعد تحميل بيانات المستخدم، قم بجلب الـ ID الخاص به
-    // هذه الدالة في AuthService أصبحت ذكية بما يكفي لإرجاع ID المطعم أو العقار
-    _realEstateId = await _authService.getRealEstateId();
+    // --- التصحيح الحاسم: استخدام الدالة المناسبة حسب نوع المستخدم ---
+    // ==========================================================
+    if (_userData != null) {
+      final currentUserType = _userData!['user_type'] as String?;
+      debugPrint("AuthProvider: Loading session for user type: $currentUserType");
+      
+      if (currentUserType == 'restaurant' || currentUserType == 'restaurant_owner') {
+         _realEstateId = await _authService.getRestaurantId();
+         debugPrint("AuthProvider: Loaded restaurant ID: $_realEstateId");
+         
+         // تشخيص إضافي للمطاعم
+         if (_realEstateId == null) {
+           debugPrint("WARNING: Restaurant ID is null for $currentUserType!");
+           debugPrint("User data restaurant_detail: ${_userData!['restaurant_detail']}");
+           
+           // محاولة استخراج ID مباشرة من بيانات المستخدم
+           if (_userData!['restaurant_detail']?['id'] != null) {
+             final directId = _userData!['restaurant_detail']['id'];
+             debugPrint("Found restaurant ID directly in user data: $directId");
+             
+             // حفظ ID مباشرة في SharedPreferences
+             final prefs = await SharedPreferences.getInstance();
+             await prefs.setInt('restaurant_id', directId);
+             _realEstateId = directId;
+             debugPrint("Saved and set restaurant ID: $_realEstateId");
+           }
+         }
+      } else if (currentUserType == 'real_estate_office' || currentUserType == 'real_estate_individual') {
+        _realEstateId = await _authService.getRealEstateId();
+        debugPrint("AuthProvider: Loaded real estate ID: $_realEstateId");
+      } else if (currentUserType == 'car_rental_owner') {
+        _realEstateId = await _authService.getCarRentalId();
+        debugPrint("AuthProvider: Loaded car rental ID: $_realEstateId");
+      } else {
+        _realEstateId = null;
+        debugPrint("AuthProvider: User type '$currentUserType' does not have an entity ID");
+      }
+    }
     // ==========================================================
 
     if (_token != null && _userData != null) {
       _authStatus = AuthStatus.authenticated;
-      // **رسالة التشخيص الجديدة التي يجب أن تراها**
+      // **رسالة التشخيص المحسنة**
       debugPrint(
-          "AuthProvider: Session loaded. User type: '$userType', Entity ID: $_realEstateId");
+          "AuthProvider: Session loaded successfully. User type: '$userType', Entity ID: $_realEstateId");
+
+      // Note: FCM token refresh hook will be handled by the UI layer with proper context
+      debugPrint("AuthProvider: FCM token refresh hook will be handled by UI layer");
 
       if (userType == 'real_estate_office' ||
           userType == 'real_estate_individual') {
@@ -106,7 +159,10 @@ class AuthProvider with ChangeNotifier {
       }
     } else {
       _authStatus = AuthStatus.unauthenticated;
+      debugPrint("AuthProvider: Session not loaded - missing token or user data");
     }
+    
+    debugPrint("=== AuthProvider _loadUserSession End ===");
     notifyListeners();
   }
 
@@ -120,18 +176,41 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
     try {
       final result = await _authService.login(email: email, password: password);
-      // **التعديل الحاسم: استدعاء _loadUserSession سيقوم بتحديث كل شيء، بما في ذلك _realEstateId**
-      await _loadUserSession();
       
-      // بدء الريفريش اللحظي للمواعيد بعد تسجيل الدخول الناجح
-      if (isLoggedIn && (userType == 'real_estate_office' || userType == 'real_estate_individual')) {
-        startAppointmentsAutoRefresh();
+      // التحقق من نجاح تسجيل الدخول قبل المتابعة
+      if (result['status'] == true) {
+        // **التعديل الحاسم: استدعاء _loadUserSession سيقوم بتحديث كل شيء، بما في ذلك _realEstateId**
+        await _loadUserSession();
+        
+        // Note: FCM token registration will be handled by the UI layer with proper context
+        if (isLoggedIn && _token != null) {
+          print('[AUTH] FCM token registration will be handled by UI layer after login');
+        }
+        
+        // بدء الريفريش اللحظي للمواعيد بعد تسجيل الدخول الناجح
+        if (isLoggedIn && (userType == 'real_estate_office' || userType == 'real_estate_individual')) {
+          startAppointmentsAutoRefresh();
+        }
       }
       
       return result;
     } catch (e) {
+      debugPrint('AuthProvider Login Error: $e');
       await logout();
-      return {'status': false, 'message': e.toString()};
+      
+      // معالجة أنواع مختلفة من الأخطاء
+      String errorMessage;
+      if (e.toString().contains('SocketException') || e.toString().contains('NetworkException')) {
+        errorMessage = 'تعذر الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى';
+      } else if (e.toString().contains('TimeoutException')) {
+        errorMessage = 'انتهت مهلة الاتصال. يرجى المحاولة مرة أخرى';
+      } else if (e.toString().contains('FormatException')) {
+        errorMessage = 'خطأ في تنسيق البيانات المستلمة من الخادم';
+      } else {
+        errorMessage = e.toString().replaceFirst('Exception: ', '');
+      }
+      
+      return {'status': false, 'message': errorMessage};
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -145,6 +224,16 @@ class AuthProvider with ChangeNotifier {
     // تصفير بيانات المحادثات إذا تم تمرير المزود
     conversationProvider?.clearData();
     
+    // FCM: حذف Device Token من الباك-إند قبل تسجيل الخروج
+    if (_token != null) {
+      try {
+        await deleteDeviceToken(_token!);
+        print('[FCM] Device token deleted successfully on logout');
+      } catch (e) {
+        print('[FCM] Error deleting device token on logout: $e');
+      }
+    }
+    
     await _authService.logout();
     _authStatus = AuthStatus.unauthenticated;
     _userData = null;
@@ -153,6 +242,95 @@ class AuthProvider with ChangeNotifier {
     _properties.clear();
     _appointments.clear(); // تصفير المواعيد عند الخروج
     notifyListeners();
+  }
+
+  /// تسجيل الدخول عبر Google (للمستخدمين العاديين فقط)
+  Future<Map<String, dynamic>> signInWithGoogle() async {
+    _isLoading = true;
+    notifyListeners();
+    
+    try {
+      // إعداد Google Sign In
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        scopes: ['email', 'profile'],
+      );
+      
+      // تسجيل الدخول عبر Google
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      
+      if (googleUser == null) {
+        // المستخدم ألغى عملية تسجيل الدخول
+        return {'status': false, 'message': 'تم إلغاء عملية تسجيل الدخول'};
+      }
+      
+      // الحصول على معلومات المصادقة
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      
+      // إرسال البيانات إلى الباك إند
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/api/auth/google/mobile'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({
+          'google_id': googleUser.id,
+          'email': googleUser.email,
+          'name': googleUser.displayName ?? '',
+          'avatar': googleUser.photoUrl ?? '',
+          'access_token': googleAuth.accessToken,
+        }),
+      );
+      
+      final responseData = jsonDecode(response.body);
+      
+      if (response.statusCode == 200 && responseData['status'] == true) {
+        // حفظ بيانات المستخدم والتوكن
+        await _authService.saveUserDataWithToken(
+          token: responseData['token'],
+          userData: responseData['user'],
+        );
+        
+        // إعادة تحميل الجلسة
+        await _loadUserSession();
+        
+        // تسجيل FCM token إذا كان المستخدم مسجل دخول
+        if (isLoggedIn && _token != null) {
+          print('[AUTH] FCM token registration will be handled by UI layer after Google login');
+        }
+        
+        return {
+          'status': true,
+          'message': responseData['message'] ?? 'تم تسجيل الدخول بنجاح',
+          'user': responseData['user']
+        };
+      } else {
+        return {
+          'status': false,
+          'message': responseData['message'] ?? 'فشل في تسجيل الدخول عبر Google'
+        };
+      }
+    } catch (e) {
+      debugPrint('Google Sign In Error: $e');
+      
+      String errorMessage;
+      if (e.toString().contains('SocketException') || e.toString().contains('NetworkException')) {
+        errorMessage = 'تعذر الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى';
+      } else if (e.toString().contains('TimeoutException')) {
+        errorMessage = 'انتهت مهلة الاتصال. يرجى المحاولة مرة أخرى';
+      } else if (e.toString().contains('sign_in_canceled')) {
+        errorMessage = 'تم إلغاء عملية تسجيل الدخول';
+      } else if (e.toString().contains('network_error')) {
+        errorMessage = 'خطأ في الشبكة. يرجى المحاولة مرة أخرى';
+      } else {
+        errorMessage = 'حدث خطأ أثناء تسجيل الدخول عبر Google';
+      }
+      
+      return {'status': false, 'message': errorMessage};
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   Future<void> fetchMyProperties() async {
@@ -167,13 +345,17 @@ class AuthProvider with ChangeNotifier {
     try {
       final fetchedProperties = await _propertyService.getMyProperties();
       _properties = fetchedProperties;
+      debugPrint("AuthProvider FETCH: Successfully loaded ${_properties.length} properties");
     } catch (error) {
-      debugPrint(
-          "AuthProvider FETCH: An error occurred while fetching properties: $error");
+      debugPrint("AuthProvider FETCH: An error occurred while fetching properties: $error");
       _properties = [];
+      
+      // يمكن إضافة معالجة أخطاء أكثر تفصيلاً هنا إذا لزم الأمر
+      // مثل التحقق من نوع الخطأ وإظهار رسائل مناسبة للمستخدم
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
-    _isLoading = false;
-    notifyListeners();
   }
 
   Future<bool> addProperty({
@@ -280,8 +462,102 @@ class AuthProvider with ChangeNotifier {
         password: password,
         phone: phone,
         governorate: governorate);
-    if (result['status'] == true) await _loadUserSession();
+    // تم إزالة _loadUserSession لتوجيه المستخدم إلى صفحة تسجيل الدخول
     return result;
+  }
+
+  /// التحقق من رمز OTP للبريد الإلكتروني
+  Future<Map<String, dynamic>> verifyEmailOtp({
+    required String email,
+    required String otp,
+  }) async {
+    print('DEBUG AuthProvider: verifyEmailOtp called');
+    print('DEBUG AuthProvider: Email: "$email"');
+    print('DEBUG AuthProvider: OTP: "$otp"');
+    
+    try {
+      final result = await _authService.verifyEmailOtp(
+        email: email,
+        otp: otp,
+      );
+      print('DEBUG AuthProvider: verifyEmailOtp result: $result');
+      return result;
+    } catch (e) {
+      print('DEBUG AuthProvider: verifyEmailOtp Exception: $e');
+      debugPrint('AuthProvider verifyEmailOtp Error: $e');
+      return {
+        'status': false,
+        'message': 'حدث خطأ أثناء التحقق من الرمز',
+      };
+    }
+  }
+
+  /// إعادة إرسال رمز OTP للبريد الإلكتروني
+  Future<Map<String, dynamic>> resendEmailOtp({
+    required String email,
+  }) async {
+    print('DEBUG AuthProvider: resendEmailOtp called');
+    print('DEBUG AuthProvider: Email: "$email"');
+    
+    try {
+      final result = await _authService.resendEmailOtp(email: email);
+      print('DEBUG AuthProvider: resendEmailOtp result: $result');
+      return result;
+    } catch (e) {
+      print('DEBUG AuthProvider: resendEmailOtp Exception: $e');
+      debugPrint('AuthProvider resendEmailOtp Error: $e');
+      return {
+        'status': false,
+        'message': 'حدث خطأ أثناء إعادة إرسال الرمز',
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> sendPasswordResetOtp({
+    required String email,
+  }) async {
+    print('DEBUG AuthProvider: sendPasswordResetOtp called');
+    print('DEBUG AuthProvider: Email: "$email"');
+    try {
+      final result = await _authService.sendPasswordResetOtp(email: email);
+      print('DEBUG AuthProvider: sendPasswordResetOtp result: $result');
+      return result;
+    } catch (e) {
+      print('DEBUG AuthProvider: sendPasswordResetOtp Exception: $e');
+      debugPrint('AuthProvider sendPasswordResetOtp Error: $e');
+      return {
+        'status': false,
+        'message': 'حدث خطأ أثناء إرسال رمز إعادة التعيين',
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> resetPasswordWithOtp({
+    required String email,
+    required String otp,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    print('DEBUG AuthProvider: resetPasswordWithOtp called');
+    print('DEBUG AuthProvider: Email: "$email"');
+    print('DEBUG AuthProvider: OTP: "$otp"');
+    try {
+      final result = await _authService.resetPasswordWithOtp(
+        email: email,
+        otp: otp,
+        password: password,
+        passwordConfirmation: passwordConfirmation,
+      );
+      print('DEBUG AuthProvider: resetPasswordWithOtp result: $result');
+      return result;
+    } catch (e) {
+      print('DEBUG AuthProvider: resetPasswordWithOtp Exception: $e');
+      debugPrint('AuthProvider resetPasswordWithOtp Error: $e');
+      return {
+        'status': false,
+        'message': 'حدث خطأ أثناء إعادة تعيين كلمة المرور',
+      };
+    }
   }
 
   Future<Map<String, dynamic>> registerRealstateOffice(
@@ -312,7 +588,7 @@ class AuthProvider with ChangeNotifier {
         officeImagePath: officeImagePath,
         commercialCardFrontPath: commercialCardFrontPath,
         commercialCardBackPath: commercialCardBackPath);
-    if (result['status'] == true) await _loadUserSession();
+    // تم إزالة _loadUserSession لتوجيه المستخدم إلى صفحة تسجيل الدخول
     return result;
   }
 
@@ -419,7 +695,7 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
     try {
       // استخدام endpoint موجود مؤقتاً حتى يتم إضافة الـ route الجديد
-      final url = Uri.parse('http://192.168.1.7:8000/api/appointments');
+      final url = Uri.parse('${AppConstants.apiBaseUrl}/appointments');
       final response = await http.get(
         url,
         headers: {
@@ -507,7 +783,7 @@ class AuthProvider with ChangeNotifier {
     if (_isFetchingAppointments) return;
     _isFetchingAppointments = true;
     try {
-      final url = Uri.parse('http://192.168.1.7:8000/api/appointments');
+      final url = Uri.parse('${AppConstants.apiBaseUrl}/appointments');
       final response = await http.get(
         url,
         headers: {
@@ -581,7 +857,7 @@ class AuthProvider with ChangeNotifier {
 
   Future<bool> approveAppointment({required int appointmentId}) async {
     final url = Uri.parse(
-        'http://192.168.1.7:8000/api/appointments/$appointmentId/status');
+        '${AppConstants.apiBaseUrl}/appointments/$appointmentId/status');
     try {
       final body = json.encode({
         "status": "provider_approved",
@@ -641,7 +917,32 @@ class AuthProvider with ChangeNotifier {
     _appointmentsRefreshTimer?.cancel();
     super.dispose();
   }
+
+  /// دالة تحديث محافظة المستخدم
+  Future<bool> updateCity(String newCity) async {
+    try {
+      final success = await _authService.updateCity(newCity);
+      if (success) {
+        // تحديث البيانات المحلية في Provider
+        if (_userData != null) {
+          _userData!['governorate'] = newCity;
+          notifyListeners();
+        }
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('خطأ في AuthProvider.updateCity: $e');
+      return false;
+    }
+  }
+
+  /// دالة للحصول على محافظة المستخدم الحالية
+  String? get userCity {
+    return _userData?['governorate'];
+  }
 }
+
 
 
 
@@ -722,7 +1023,13 @@ class AuthProvider with ChangeNotifier {
 //     await _loadUserSession();
 //   }
 
-//   /// تحميل جلسة المستخدم من التخزين المحلي وجلب بياناته
+//   /// إعادة تحميل الجلسة يدوياً (للاستخدام في حالات الأخطاء)
+//   Future<void> reloadSession() async {
+//     debugPrint("=== Manual session reload requested ===");
+//     await _loadUserSession();
+//   }
+
+//   /// تحميل جلسة المستخدم من التخزين المحلي وجلب بياناته (النسخة النهائية المصححة)
 //   Future<void> _loadUserSession() async {
 //     _token = await _authService.getToken();
 //     _userData = await _authService.getUserData();

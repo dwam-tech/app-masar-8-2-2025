@@ -245,7 +245,7 @@ class _ResTimeWorkEditState extends State<ResTimeWorkEdit> {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-               color: Colors.grey.withValues(alpha: 0.1),
+               color: Colors.grey,
                spreadRadius: 1,
                blurRadius: 3,
                offset: const Offset(0, 2),

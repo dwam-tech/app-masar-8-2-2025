@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:saba2v2/models/car_model.dart';
+import 'package:saba2v2/models/hotel_offer.dart';
 import 'package:saba2v2/providers/auth_provider.dart';
 import 'package:saba2v2/screens/auth/login_screen.dart';
 import 'package:saba2v2/screens/auth/register_user_screen.dart';
 import 'package:saba2v2/screens/auth/register_provider_screen.dart';
+import 'package:saba2v2/screens/auth/otp_verification_screen.dart';
 import 'package:saba2v2/screens/business/CarsScreens/CarDetailsScreen.dart';
 import 'package:saba2v2/screens/business/CarsScreens/CarRentalAnalysisScreen.dart';
 import 'package:saba2v2/screens/business/CarsScreens/CarRentalDataEdit.dart';
@@ -55,18 +57,47 @@ import 'package:saba2v2/screens/business/RealStateScreens/RealStateHomeScreen.da
 import 'package:saba2v2/screens/splash/splash_screen.dart';
 import 'package:saba2v2/screens/auth/forgotPassword.dart';
 import 'package:saba2v2/screens/user/SettingsUser.dart';
+import 'package:saba2v2/screens/user/flight_search_screen.dart';
+import 'package:saba2v2/screens/user/flight_results_screen.dart';
+import 'package:saba2v2/screens/user/flight_details_screen.dart';
+import 'package:saba2v2/screens/user/booking_screen.dart';
+import 'package:saba2v2/screens/user/booking_confirmation_screen.dart';
+import 'package:saba2v2/models/flight_offer.dart';
+import 'package:saba2v2/screens/user/hotel_search_screen.dart';
+import 'package:saba2v2/screens/user/hotel_results_screen.dart';
+import 'package:saba2v2/screens/user/hotel_details_screen.dart';
+import 'package:saba2v2/screens/user/hotel_booking_screen.dart';
 import 'package:saba2v2/screens/user/restaurant-details.dart';
 import 'package:saba2v2/screens/user/user_home_screen.dart';
+import 'package:saba2v2/screens/user/user_restaurant_home.dart';
 import 'package:saba2v2/screens/user/profile_screen.dart';
+import 'package:saba2v2/screens/user/cart_screen.dart';
+import 'package:saba2v2/screens/user/featured_properties_screen.dart';
+import 'package:saba2v2/screens/user/featured_property_details_screen.dart';
+import 'package:saba2v2/screens/user/search_screen.dart';
+import 'package:saba2v2/screens/user/search_selection_screen.dart';
+import 'package:saba2v2/screens/user/restaurant_search_screen.dart';
+import 'package:saba2v2/screens/user/property_search_screen.dart';
 import 'package:saba2v2/screens/business/CarsScreens/delivery_office_information.dart';
 import 'package:saba2v2/screens/chat_screen.dart';
 import 'package:saba2v2/screens/conversations_list_screen.dart';
+import 'package:saba2v2/screens/user/all_properties_list_screen.dart';
+import 'package:saba2v2/screens/user/security_permit_screen.dart';
+import 'package:saba2v2/screens/user/filtered_restaurants_by_section_screen.dart';
+import 'package:saba2v2/screens/user/car_service_selection_screen.dart';
+import 'package:saba2v2/screens/user/delivery_request_screen.dart';
+import 'package:saba2v2/screens/user/car_rental_request_screen.dart';
+import 'package:saba2v2/screens/user/my_orders_screen.dart';
+// إضافة NavigationService لاستخدام navigatorKey الخاص به مع GoRouter
+import 'package:saba2v2/screens/user/widgets/order_filter_widgets.dart';
 
 class AppRouter {
   static GoRouter createRouter(AuthProvider authProvider) {
     return GoRouter(
       initialLocation: '/SplashScreen',
       refreshListenable: authProvider,
+      // ربط navigatorKey لضمان إمكانية الوصول إلى BuildContext عبر NavigationService
+      navigatorKey: NavigationService.navigatorKey,
       redirect: (BuildContext context, GoRouterState state) {
         // تعطيل التوجيه بناءً على حالة المصادقة للسماح بالوصول لجميع الصفحات
         return null; // السماح بالوصول لجميع المسارات دون قيود
@@ -103,6 +134,28 @@ class AppRouter {
           path: '/register-provider',
           name: 'registerProvider',
           builder: (context, state) => const RegisterProviderScreen(),
+        ),
+        GoRoute(
+          path: '/otp-verification',
+          name: 'otpVerification',
+          builder: (context, state) {
+            final extra = state.extra;
+            String email = '';
+            String? purpose;
+            String? userName;
+            if (extra is Map) {
+              if (extra['email'] is String) email = extra['email'];
+              if (extra['purpose'] is String) purpose = extra['purpose'];
+              if (extra['userName'] is String) userName = extra['userName'];
+            } else if (extra is String) {
+              email = extra;
+            }
+            return OtpVerificationScreen(
+              email: email,
+              userName: userName,
+              purpose: purpose ?? 'email_verification',
+            );
+          },
         ),
         // شاشات التسجيل كمزود خدمة
         GoRoute(
@@ -176,10 +229,18 @@ class AppRouter {
                 body: Center(child: Text('خطأ: معرف العقار غير موجود')),
               );
             }
-            return PropertyDetailsScreen(propertyId: id);
+            return FeaturedPropertyDetailsScreen(propertyId: id);
           },
         ),
         // شاشات المطاعم (Restaurants)
+        GoRoute(
+          path: '/restaurants/menu-section/:section',
+          name: 'filteredRestaurantsBySection',
+          builder: (context, state) {
+            final section = state.pathParameters['section'] ?? '';
+            return FilteredRestaurantsBySectionScreen(section: section);
+          },
+        ),
         GoRoute(
           path: '/ResturantLawData',
           name: 'ResturantLawData',
@@ -191,6 +252,14 @@ class AppRouter {
           builder: (context, state) => ResturantInformation(
             legalData: state.extra as RestaurantLegalData,
           ),
+        ),
+        GoRoute(
+          path: '/restaurant-details/:id',
+          name: 'restaurantDetails',
+          builder: (context, state) {
+            final restaurantId = state.pathParameters['id']!;
+            return RestaurantDetailsScreen(restaurantId: restaurantId);
+          },
         ),
         GoRoute(
           path: '/ResturantWorkTime',
@@ -322,6 +391,11 @@ class AppRouter {
           builder: (context, state) => const UserHomeScreen(),
         ),
         GoRoute(
+          path: '/user-restaurants',
+          name: 'userRestaurants',
+          builder: (context, state) => const UserRestaurantHome(),
+        ),
+        GoRoute(
           path: '/profile',
           name: 'profile',
           builder: (context, state) => const ProfileScreen(),
@@ -330,6 +404,66 @@ class AppRouter {
           path: '/SettingsUser',
           name: 'SettingsUser',
           builder: (context, state) => const SettingsUser(),
+        ),
+        GoRoute(
+          path: '/cart',
+          name: 'cart',
+          builder: (context, state) => const CartScreen(),
+        ),
+        GoRoute(
+          path: '/my-orders',
+          name: 'myOrders',
+          builder: (context, state) => const MyOrdersScreen(),
+        ),
+        GoRoute(
+          path: '/featured-properties',
+          name: 'featuredProperties',
+          builder: (context, state) => const FeaturedPropertiesScreen(),
+        ),
+        GoRoute(
+          path: '/search',
+          name: 'search',
+          builder: (context, state) => SearchScreen(),
+        ),
+        GoRoute(
+          path: '/search-selection',
+          name: 'searchSelection',
+          builder: (context, state) => const SearchSelectionScreen(),
+        ),
+        GoRoute(
+          path: '/restaurant-search',
+          name: 'restaurantSearch',
+          builder: (context, state) => const RestaurantSearchScreen(),
+        ),
+        GoRoute(
+          path: '/property-search',
+          name: 'propertySearch',
+          builder: (context, state) => const PropertySearchScreen(),
+        ),
+        GoRoute(
+          path: '/all-properties',
+          name: 'allProperties',
+          builder: (context, state) => const AllPropertiesListScreen(),
+        ),
+        GoRoute(
+          path: '/security-permit',
+          name: 'securityPermit',
+          builder: (context, state) => const SecurityPermitScreen(),
+        ),
+        GoRoute(
+          path: '/car-service-selection',
+          name: 'carServiceSelection',
+          builder: (context, state) => const CarServiceSelectionScreen(),
+        ),
+        GoRoute(
+          path: '/delivery-request',
+          name: 'deliveryRequest',
+          builder: (context, state) => const DeliveryRequestScreen(),
+        ),
+        GoRoute(
+          path: '/car-rental',
+          name: 'carRental',
+          builder: (context, state) => const CarRentalRequestScreen(),
         ),
         // شاشات إضافية
         GoRoute(
@@ -365,7 +499,16 @@ class AppRouter {
         GoRoute(
           path: '/ResetProfilePassword',
           name: 'ResetProfilePassword',
-          builder: (context, state) => const ResetProfilePassword(),
+          builder: (context, state) {
+            final extra = state.extra;
+            String email = '';
+            if (extra is Map && extra['email'] is String) {
+              email = extra['email'];
+            } else if (extra is String) {
+              email = extra;
+            }
+            return ResetProfilePassword(email: email);
+          },
         ),
         GoRoute(
           path: '/AboutApp',
@@ -386,6 +529,66 @@ class AppRouter {
           path: '/ContactUsScreen',
           name: 'ContactUsScreen',
           builder: (context, state) => const ContactUsScreen(),
+        ),
+        GoRoute(
+          path: '/flight-search',
+          name: 'flightSearch',
+          builder: (context, state) => FlightSearchScreen(),
+        ),
+        GoRoute(
+          path: '/flight-results',
+          name: 'flightResults',
+          builder: (context, state) => FlightResultsScreen(),
+        ),
+        GoRoute(
+          path: '/flight-details',
+          name: 'flightDetails',
+          builder: (context, state) {
+            final offer = state.extra as FlightOffer;
+            return FlightDetailsScreen(offer: offer);
+          },
+        ),
+        GoRoute(
+          path: '/booking',
+          name: 'booking',
+          builder: (context, state) {
+            final offer = state.extra as FlightOffer;
+            return BookingScreen(offer: offer);
+          },
+        ),
+        GoRoute(
+          path: '/booking-confirmation',
+          name: 'bookingConfirmation',
+          builder: (context, state) {
+            final bookingData = state.extra as Map<String, dynamic>;
+            return BookingConfirmationScreen(bookingData: bookingData);
+          },
+        ),
+        GoRoute(
+          path: '/hotel-search',
+          name: 'hotelSearch',
+          builder: (context, state) => HotelSearchScreen(),
+        ),
+        GoRoute(
+          path: '/hotel-results',
+          name: 'hotelResults',
+          builder: (context, state) => HotelResultsScreen(),
+        ),
+        GoRoute(
+          path: '/hotel-details',
+          name: 'hotelDetails',
+          builder: (context, state) {
+            final hotel = state.extra as HotelOffer;
+            return HotelDetailsScreen(hotel: hotel);
+          },
+        ),
+        GoRoute(
+          path: '/hotel-booking',
+          name: 'hotelBooking',
+          builder: (context, state) {
+            final hotel = state.extra as HotelOffer;
+            return HotelBookingScreen(hotel: hotel);
+          },
         ),
       ],
       errorBuilder: (context, state) => Scaffold(

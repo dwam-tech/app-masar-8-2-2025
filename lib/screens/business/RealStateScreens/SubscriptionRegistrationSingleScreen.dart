@@ -10,6 +10,7 @@ import 'package:flutter/foundation.dart';
 import 'package:saba2v2/components/UI/image_picker_row.dart';
 import 'package:saba2v2/components/UI/section_title.dart';
 import 'package:saba2v2/providers/auth_provider.dart'; // تأكد من وجود هذا الـ Provider
+import '../../../config/constants.dart';
 
 
 class SubscriptionRegistrationSingleScreen extends StatefulWidget {
@@ -32,6 +33,10 @@ class _SubscriptionRegistrationSingleScreenState
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
+
+  // Password visibility toggles
+  bool _isPasswordVisible = false;
+  bool _isConfirmPasswordVisible = false;
 
   // State for local image paths and uploaded URLs
   String? _profileImagePath;
@@ -56,7 +61,7 @@ class _SubscriptionRegistrationSingleScreenState
   ];
 
   // Base URL for the Laravel API
-  static const String _baseUrl = 'http://192.168.1.7:8000'; // استبدل هذا بالـ URL الفعلي
+  static const String _baseUrl = AppConstants.baseUrl; // استبدل هذا بالـ URL الفعلي
 
   Future<void> _pickFile(String fieldName) async {
     if (_isLoading) return;
@@ -152,31 +157,146 @@ class _SubscriptionRegistrationSingleScreenState
     });
   }
 
-  Future<void> _submitForm() async {
-    if (_isLoading) return;
-    if (!_formKey.currentState!.validate()) return;
+  // Validation functions
+  String? _validateRequiredField(String? value, {int maxLength = 100}) {
+    if (value == null || value.trim().isEmpty) {
+      return 'هذا الحقل مطلوب';
+    }
+    if (value.trim().length > maxLength) {
+      return 'يجب ألا يتجاوز النص $maxLength حرف';
+    }
+    return null;
+  }
 
-    if (!_acceptTerms) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('يجب الموافقة على الشروط والأحكام')),
-        );
-        return;
+  String? _validateAgentName(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'اسم الوسيط مطلوب';
+    }
+    if (value.trim().length < 2 || value.trim().length > 50) {
+      return 'يجب أن يكون اسم الوسيط بين 2 و 50 حرف';
+    }
+    return null;
+  }
+
+  String? _validateEmail(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'البريد الإلكتروني مطلوب';
+    }
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    if (!emailRegex.hasMatch(value.trim())) {
+      return 'يرجى إدخال بريد إلكتروني صحيح';
+    }
+    return null;
+  }
+
+  String? _validatePhone(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'رقم الهاتف مطلوب';
+    }
+    // Egyptian phone number patterns
+    final phoneRegex = RegExp(r'^(\+20|0020|20)?1[0125][0-9]{8}$');
+    if (!phoneRegex.hasMatch(value.replaceAll(RegExp(r'[\s-]'), ''))) {
+      return 'يرجى إدخال رقم هاتف مصري صحيح';
+    }
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'كلمة المرور مطلوبة';
+    }
+    if (value.length < 8) {
+      return 'يجب أن تكون كلمة المرور 8 أحرف على الأقل';
+    }
+    if (!RegExp(r'^(?=.*[a-zA-Z])(?=.*[0-9])').hasMatch(value)) {
+      return 'يجب أن تحتوي كلمة المرور على أحرف وأرقام';
+    }
+    return null;
+  }
+
+  String? _validateConfirmPassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'تأكيد كلمة المرور مطلوب';
+    }
+    if (value != _passwordController.text) {
+      return 'كلمتا المرور غير متطابقتين';
+    }
+    return null;
+  }
+
+  Future<void> _submitForm() async {
+    if (_isLoading) return; // Prevent multiple submissions
+
+    // إلغاء التركيز من جميع الحقول
+    FocusScope.of(context).unfocus();
+
+    if (!_formKey.currentState!.validate()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('الرجاء تعبئة كل الحقول المطلوبة بشكل صحيح'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
+      return;
     }
 
+    // التحقق من تطابق كلمة المرور
     if (_passwordController.text != _confirmPasswordController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('كلمتا السر غير متطابقتين')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('كلمتا المرور غير متطابقتين'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+
+    // التحقق من الموافقة على الشروط
+    if (!_acceptTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يجب الموافقة على الشروط والأحكام'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+
+    // التحقق من اختيار المحافظة
+    if (_selectedCity == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('الرجاء اختيار المحافظة'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
       return;
     }
     
-    // تأكد من رفع الصور المطلوبة (الهوية على الأقل)
+    // التحقق من رفع الصور المطلوبة
     if (_profileImageUrl == null || _agentIdFrontImageUrl == null || _agentIdBackImageUrl == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('الرجاء رفع صورة الملف الشخصي وصور الهوية')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('الرجاء رفع صورة الملف الشخصي وصور الهوية'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
       return;
     }
 
     setState(() => _isLoading = true);
     try {
+      // التحقق من توفر AuthProvider
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      if (authProvider == null) {
+        throw Exception('خدمة المصادقة غير متوفرة');
+      }
+
       // استدعاء الدالة الجديدة من الـ Provider
       final result = await authProvider.registerIndividualAgent(
         name: _agentNameController.text.trim(),
@@ -190,28 +310,79 @@ class _SubscriptionRegistrationSingleScreenState
         // الصور الاختيارية
         taxCardFrontImage: _taxCardFrontImageUrl,
         taxCardBackImage: _taxCardBackImageUrl,
-      );
+      ).timeout(const Duration(seconds: 30));
 
-      if (result['status']) {
+      // التحقق من صحة الاستجابة
+      if (result == null) {
+        throw Exception('لم يتم الحصول على استجابة من الخادم');
+      }
+
+      if (result['status'] == true) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('تم إنشاء الحساب بنجاح'), backgroundColor: Colors.green),
+            const SnackBar(
+              content: Text('تم إنشاء الحساب بنجاح'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 3),
+            ),
           );
-          context.go('/RealStateHomeScreen');
+          context.go('/login');
         }
       } else {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(result['message'] ?? 'حدث خطأ أثناء التسجيل')),
+            SnackBar(
+              content: Text(result['message'] ?? 'حدث خطأ أثناء التسجيل'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
+            ),
           );
         }
       }
+    } on SocketException {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('لا يوجد اتصال بالإنترنت'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+    } on FormatException {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('خطأ في تنسيق البيانات المستلمة من الخادم'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+    } on Exception catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('حدث خطأ: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('حدث خطأ: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('حدث خطأ غير متوقع'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 4),
+          ),
+        );
       }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -230,6 +401,9 @@ class _SubscriptionRegistrationSingleScreenState
     required TextEditingController controller,
     bool obscureText = false,
     TextInputType? keyboardType,
+    String? Function(String?)? validator,
+    bool isPassword = false,
+    VoidCallback? onToggleVisibility,
   }) {
     return TextFormField(
       controller: controller,
@@ -245,8 +419,17 @@ class _SubscriptionRegistrationSingleScreenState
           borderSide: BorderSide.none,
         ),
         contentPadding: const EdgeInsets.symmetric(vertical: 15.0, horizontal: 20.0),
+        suffixIcon: isPassword
+            ? IconButton(
+                icon: Icon(
+                  obscureText ? Icons.visibility : Icons.visibility_off,
+                  color: Colors.grey[600],
+                ),
+                onPressed: onToggleVisibility,
+              )
+            : null,
       ),
-      validator: (value) {
+      validator: validator ?? (value) {
         if (value == null || value.isEmpty) return 'هذا الحقل مطلوب';
         if (hintText == 'البريد الإلكتروني' && !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
           return 'بريد إلكتروني غير صحيح';

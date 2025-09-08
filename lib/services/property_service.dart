@@ -5,9 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:saba2v2/models/property_model.dart';
 import 'package:saba2v2/services/auth_service.dart'; // سنحتاجها لجلب التوكن
+import '../config/constants.dart';
 
 class PropertyService {
-  final String _baseUrl = 'http://192.168.1.7:8000'; // نفس الـ Base URL
+  final String _baseUrl = AppConstants.baseUrl; // نفس الـ Base URL
   final AuthService _authService = AuthService(); // للوصول للتوكن
 
   // دالة لإضافة عقار جديد

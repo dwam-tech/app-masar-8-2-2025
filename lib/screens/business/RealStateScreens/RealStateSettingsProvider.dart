@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:saba2v2/providers/auth_provider.dart';
+import 'package:saba2v2/providers/conversation_provider.dart';
 import 'package:saba2v2/services/auth_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -20,6 +21,14 @@ class RealStateSettingsProvider extends StatefulWidget {
 
 class _RealStateSettingsProviderState extends State<RealStateSettingsProvider> {
   bool isArabic = true; // متغير لتتبع اللغة الحالية
+
+  Future<void> _logout(BuildContext context) async {
+    final conversationProvider = context.read<ConversationProvider>();
+    await context.read<AuthProvider>().logout(conversationProvider);
+    if (context.mounted) {
+      context.go('/login');
+    }
+  }
 
   // --- متغيرات الحالة لجلب الإعدادات ---
   final AuthService _authService = AuthService();
@@ -218,7 +227,7 @@ class _RealStateSettingsProviderState extends State<RealStateSettingsProvider> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: () => context.go("/login"),
+                          onPressed: () => _logout(context),
                           icon: const Icon(Icons.logout, color: Colors.white, size: 20),
                           label: const Text(
                             "تسجيل الخروج",

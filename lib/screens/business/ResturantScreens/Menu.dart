@@ -34,15 +34,28 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final restaurantId = authProvider.realEstateId;
 
+    debugPrint("=== _fetchInitialData Debug ===");
+    debugPrint("Auth Provider User Type: ${authProvider.userType}");
+    debugPrint("Auth Provider Is Logged In: ${authProvider.isLoggedIn}");
+    debugPrint("Restaurant ID from AuthProvider: $restaurantId");
+    debugPrint("User Data: ${authProvider.userData}");
+
     if (restaurantId != null) {
+      debugPrint("Restaurant ID found, fetching menu...");
       final menuProvider = Provider.of<MenuManagementProvider>(context, listen: false);
       menuProvider.fetchMenu(restaurantId).then((_) {
+        debugPrint("Menu fetch completed. Sections count: ${menuProvider.sections.length}");
         if (mounted && menuProvider.sections.isNotEmpty) {
           setState(() {
             _selectedSectionId = menuProvider.sections.first.id;
           });
+          debugPrint("Selected first section ID: ${_selectedSectionId}");
         }
+      }).catchError((error) {
+        debugPrint("Error fetching menu: $error");
       });
+    } else {
+      debugPrint("Restaurant ID is null, cannot fetch menu");
     }
   }
 
@@ -327,8 +340,65 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
     return Consumer2<AuthProvider, MenuManagementProvider>(
       builder: (context, authProvider, menuProvider, child) {
         
+        // إضافة تشخيص مفصل
+        debugPrint("=== Restaurant Menu Screen Debug ===");
+        debugPrint("User Type: ${authProvider.userType}");
+        debugPrint("Is Logged In: ${authProvider.isLoggedIn}");
+        debugPrint("Real Estate ID: ${authProvider.realEstateId}");
+        debugPrint("User Data: ${authProvider.userData}");
+        
         if (authProvider.realEstateId == null) {
-          return const _ErrorScreen(message: "لا يمكن الوصول لبيانات المطعم.");
+          // إضافة معلومات تشخيصية أكثر تفصيلاً
+          return Directionality(
+            textDirection: TextDirection.rtl,
+            child: Scaffold(
+              appBar: AppBar(title: const Text("خطأ في البيانات")),
+              body: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                      const SizedBox(height: 16),
+                      const Text(
+                        "لا يمكن الوصول لبيانات المطعم",
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        "نوع المستخدم: ${authProvider.userType ?? 'غير محدد'}\n"
+                        "حالة تسجيل الدخول: ${authProvider.isLoggedIn ? 'مسجل' : 'غير مسجل'}\n"
+                        "معرف المطعم: ${authProvider.realEstateId ?? 'غير موجود'}",
+                        style: const TextStyle(fontSize: 14, color: Colors.grey),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          debugPrint("=== Manual reload button pressed ===");
+                          final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                          await authProvider.reloadSession();
+                        },
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('إعادة تحميل البيانات'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: () => context.go('/restaurant-home'),
+                        child: const Text("العودة للرئيسية"),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
         }
 
         // --- بداية الحل النهائي لخطأ setState ---

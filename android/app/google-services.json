@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "60942189391",
+    "project_id": "msar-90137",
+    "storage_bucket": "msar-90137.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:60942189391:android:eff146965b1742d8003b3a",
+        "android_client_info": {
+          "package_name": "com.example.saba2v2"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "60942189391-n3ivpar8cllvrrittoq14u7827dd2692.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.saba2v2",
+            "certificate_hash": "f2cab3be2eb947f84ae519e0604662470a8af9e5"
+          }
+        },
+        {
+          "client_id": "60942189391-ctmkm0o1vnk4ceboen5o2g0j5puak00o.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAfYjmNlR7vDXIkSSWx-hVu0Dq7ms8GYjI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "60942189391-ctmkm0o1vnk4ceboen5o2g0j5puak00o.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

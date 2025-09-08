@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/conversation_provider.dart';
-import '../providers/auth_provider.dart';
+import '../providers/conversations_provider.dart';
+import '../models/conversation_model.dart';
 import 'chat_screen.dart';
+import '../utils/app_colors.dart';
+import '../utils/app_text_styles.dart';
+import 'package:timeago/timeago.dart' as timeago;
+import '../config/admin_settings.dart';
 
 class ConversationsListScreen extends StatefulWidget {
   const ConversationsListScreen({super.key});
@@ -12,52 +16,74 @@ class ConversationsListScreen extends StatefulWidget {
 }
 
 class _ConversationsListScreenState extends State<ConversationsListScreen> {
+  final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  String? _selectedFilter;
+
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
+    
+    // تهيئة المزود وتحميل المحادثات
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initializeAndFetch();
+      final provider = Provider.of<ConversationsProvider>(context, listen: false);
+      provider.initialize();
     });
   }
 
-  void _initializeAndFetch() {
-    final authProvider = context.read<AuthProvider>();
-    final conversationProvider = context.read<ConversationProvider>();
-    
-    // التحقق من تسجيل الدخول وتهيئة ConversationProvider إذا لم يكن مُهيأ
-    if (authProvider.isLoggedIn && !conversationProvider.isInitialized) {
-      conversationProvider.initialize(
-        authProvider.token!,
-        authProvider.userData!['id'],
-      );
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      final provider = Provider.of<ConversationsProvider>(context, listen: false);
+      provider.loadMore();
     }
-    
-    // جلب المحادثة الوحيدة
-    if (conversationProvider.isInitialized) {
-      conversationProvider.fetchConversation();
-    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.backgroundColor,
       appBar: AppBar(
-        title: const Text('الدعم الفني'),
-        backgroundColor: const Color(0xFF2E7D32),
+        title: const Text(
+          'المحادثات',
+          style: AppTextStyles.heading2,
+        ),
+        backgroundColor: AppColors.primaryColor,
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          // أيقونة الدعم الفني
+          IconButton(
+            icon: const Icon(Icons.support_agent, size: 28),
+            onPressed: () => _openSupportChat(context),
+            tooltip: 'الدعم الفني',
+          ),
+          // أيقونة البحث
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () => _showSearchDialog(context),
+          ),
+        ],
       ),
-      body: Consumer<ConversationProvider>(
+      body: Consumer<ConversationsProvider>(
         builder: (context, provider, child) {
-          if (provider.isLoading) {
+          if (provider.isLoading && provider.conversations.isEmpty) {
             return const Center(
               child: CircularProgressIndicator(
-                color: Color(0xFF2E7D32),
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryColor),
               ),
             );
           }
 
-          if (provider.error != null) {
+          if (provider.error != null && provider.conversations.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -70,17 +96,14 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
                   const SizedBox(height: 16),
                   Text(
                     provider.error!,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[600],
-                    ),
+                    style: AppTextStyles.body1.copyWith(color: Colors.grey[600]),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton(
-                    onPressed: () => provider.fetchConversation(),
+                    onPressed: () => provider.refresh(),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2E7D32),
+                      backgroundColor: AppColors.primaryColor,
                       foregroundColor: Colors.white,
                     ),
                     child: const Text('إعادة المحاولة'),
@@ -90,253 +113,380 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
             );
           }
 
-          // إذا لم توجد محادثة، عرض خيار بدء محادثة جديدة
-          if (provider.conversation == null) {
+          final conversations = _getFilteredConversations(provider);
+
+          if (conversations.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    Icons.support_agent,
-                    size: 80,
+                    Icons.chat_bubble_outline,
+                    size: 64,
                     color: Colors.grey[400],
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
                   Text(
-                    'مرحباً بك في الدعم الفني',
-                    style: TextStyle(
-                      fontSize: 20,
-                      color: Colors.grey[700],
-                      fontWeight: FontWeight.w600,
-                    ),
+                    _searchQuery.isNotEmpty 
+                        ? 'لا توجد محادثات تطابق البحث'
+                        : 'لا توجد محادثات بعد',
+                    style: AppTextStyles.body1.copyWith(color: Colors.grey[600]),
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'نحن هنا لمساعدتك في أي استفسار\nابدأ محادثة معنا الآن',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[500],
-                      height: 1.5,
+                  if (_searchQuery.isEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'ابدأ محادثة جديدة مع الدعم الفني',
+                      style: AppTextStyles.caption.copyWith(color: Colors.grey[500]),
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 32),
-                  ElevatedButton.icon(
-                    onPressed: () => _openChatScreen(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2E7D32),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 32,
-                        vertical: 16,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(25),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: () => _openSupportChat(context),
+                      icon: const Icon(Icons.support_agent),
+                      label: const Text('تواصل مع الدعم'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryColor,
+                        foregroundColor: Colors.white,
                       ),
                     ),
-                    icon: const Icon(Icons.chat, size: 24),
-                    label: const Text(
-                      'بدء المحادثة',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                    ),
-                  ),
+                  ],
                 ],
               ),
             );
           }
 
-          // إذا وجدت محادثة، عرض ملخص المحادثة
-          return RefreshIndicator(
-            onRefresh: () => provider.fetchConversation(),
-            color: const Color(0xFF2E7D32),
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // بطاقة المحادثة
-                    Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: InkWell(
-                        onTap: () => _openChatScreen(context),
-                        borderRadius: BorderRadius.circular(12),
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF2E7D32).withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(50),
-                                    ),
-                                    child: const Icon(
-                                      Icons.support_agent,
-                                      color: Color(0xFF2E7D32),
-                                      size: 32,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Text(
-                                          'الدعم الفني',
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                            color: Color(0xFF2E7D32),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          provider.conversation!.status == 'active' 
-                                              ? 'متاح الآن' 
-                                              : 'غير متاح',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: provider.conversation!.status == 'active'
-                                                ? Colors.green[600]
-                                                : Colors.orange[600],
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  if (provider.hasUnreadMessages) ...[
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.red,
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        '${provider.unreadMessagesCount}',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                              if (provider.messages.isNotEmpty) ...[
-                                const SizedBox(height: 16),
-                                const Divider(),
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.message,
-                                      size: 16,
-                                      color: Colors.grey[600],
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        provider.messages.last.content,
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey[700],
-                                        ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.access_time,
-                                      size: 14,
-                                      color: Colors.grey[500],
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      _formatTime(provider.messages.last.createdAt),
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey[500],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ],
+          return Column(
+            children: [
+              // شريط الفلاتر
+              if (_selectedFilter != null || _searchQuery.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      if (_searchQuery.isNotEmpty) ...[
+                        Chip(
+                          label: Text('البحث: $_searchQuery'),
+                          onDeleted: () {
+                            setState(() {
+                              _searchQuery = '';
+                              _searchController.clear();
+                            });
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      if (_selectedFilter != null) ...[
+                        Chip(
+                          label: Text(_getFilterLabel(_selectedFilter!)),
+                          onDeleted: () {
+                            setState(() {
+                              _selectedFilter = null;
+                            });
+                          },
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              
+              // قائمة المحادثات
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: provider.refresh,
+                  color: AppColors.primaryColor,
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemCount: conversations.length + (provider.isLoading ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index >= conversations.length) {
+                        return const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryColor),
+                            ),
                           ),
-                        ),
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // زر فتح المحادثة
-                    ElevatedButton.icon(
-                      onPressed: () => _openChatScreen(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2E7D32),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      icon: const Icon(Icons.chat_bubble),
-                      label: const Text(
-                        'فتح المحادثة',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ],
+                        );
+                      }
+
+                      final conversation = conversations[index];
+                      return _buildConversationItem(context, conversation, provider);
+                    },
+                  ),
                 ),
               ),
-            ),
+            ],
           );
         },
       ),
-    );
-  }
-
-  void _openChatScreen(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const ChatScreen(),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showNewConversationDialog(context),
+        backgroundColor: AppColors.primaryColor,
+        child: const Icon(Icons.add_comment, color: Colors.white),
+        tooltip: 'محادثة جديدة',
       ),
     );
   }
 
-  String _formatTime(DateTime? dateTime) {
-    if (dateTime == null) return '';
+  Widget _buildConversationItem(
+    BuildContext context,
+    ConversationListItem conversation,
+    ConversationsProvider provider,
+  ) {
+    final hasUnread = conversation.unreadCount > 0;
+    final timeText = conversation.lastMessageAt != null
+        ? timeago.format(conversation.lastMessageAt!, locale: 'ar')
+        : timeago.format(conversation.createdAt, locale: 'ar');
 
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      elevation: hasUnread ? 2 : 1,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: CircleAvatar(
+          backgroundColor: _getConversationColor(conversation.type),
+          child: Icon(
+            _getConversationIcon(conversation.type),
+            color: Colors.white,
+          ),
+        ),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                conversation.title,
+                style: AppTextStyles.subtitle1.copyWith(
+                  fontWeight: hasUnread ? FontWeight.bold : FontWeight.normal,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (hasUnread)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  conversation.unreadCount.toString(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (conversation.otherParticipant != null)
+              Text(
+                conversation.otherParticipant!.name,
+                style: AppTextStyles.caption.copyWith(
+                  color: Colors.grey[600],
+                ),
+              ),
+            if (conversation.lastMessage != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                conversation.lastMessage!.content,
+                style: AppTextStyles.body2.copyWith(
+                  color: hasUnread ? Colors.black87 : Colors.grey[600],
+                  fontWeight: hasUnread ? FontWeight.w500 : FontWeight.normal,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ],
+        ),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              timeText,
+              style: AppTextStyles.caption.copyWith(
+                color: hasUnread ? AppColors.primaryColor : Colors.grey[500],
+                fontWeight: hasUnread ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: _getStatusColor(conversation.status),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ],
+        ),
+        onTap: () => _openConversation(context, conversation, provider),
+      ),
+    );
+  }
 
-    if (difference.inMinutes < 1) {
-      return 'الآن';
-    } else if (difference.inHours < 1) {
-      return 'منذ ${difference.inMinutes} دقيقة';
-    } else if (difference.inDays < 1) {
-      return 'منذ ${difference.inHours} ساعة';
-    } else if (difference.inDays < 7) {
-      return 'منذ ${difference.inDays} يوم';
-    } else {
-      return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
+  List<ConversationListItem> _getFilteredConversations(ConversationsProvider provider) {
+    var conversations = provider.conversations;
+
+    // تطبيق البحث
+    if (_searchQuery.isNotEmpty) {
+      conversations = provider.searchConversations(_searchQuery);
+    }
+
+    // تطبيق الفلتر
+    if (_selectedFilter != null) {
+      switch (_selectedFilter) {
+        case 'unread':
+          conversations = conversations.where((c) => c.unreadCount > 0).toList();
+          break;
+        case 'support':
+          conversations = conversations.where((c) => c.type == AdminSettings.conversationTypeSupport).toList();
+          break;
+        case 'private':
+          conversations = conversations.where((c) => c.type == AdminSettings.conversationTypeUser).toList();
+          break;
+      }
+    }
+
+    return conversations;
+  }
+
+  void _openConversation(
+    BuildContext context,
+    ConversationListItem conversation,
+    ConversationsProvider provider,
+  ) {
+    // تحديد المحادثة كمقروءة
+    if (conversation.unreadCount > 0) {
+      provider.markConversationAsRead(conversation.id);
+    }
+
+    // فتح شاشة المحادثة
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          conversationId: conversation.id.toString(),
+          conversationTitle: conversation.title,
+        ),
+      ),
+    );
+  }
+
+  void _openSupportChat(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const ChatScreen(
+          isSupportChat: true,
+        ),
+      ),
+    );
+  }
+
+  void _showSearchDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('البحث في المحادثات'),
+        content: TextField(
+          controller: _searchController,
+          decoration: const InputDecoration(
+            hintText: 'ابحث عن محادثة...',
+            prefixIcon: Icon(Icons.search),
+          ),
+          autofocus: true,
+          onSubmitted: (value) {
+            setState(() {
+              _searchQuery = value.trim();
+            });
+            Navigator.pop(context);
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                _searchQuery = _searchController.text.trim();
+              });
+              Navigator.pop(context);
+            },
+            child: const Text('بحث'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showNewConversationDialog(BuildContext context) {
+    // يمكن تطوير هذا لاحقاً لإضافة محادثات جديدة مع مستخدمين آخرين
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('ميزة إنشاء محادثة جديدة قيد التطوير'),
+        backgroundColor: AppColors.primaryColor,
+      ),
+    );
+  }
+
+  IconData _getConversationIcon(String type) {
+    switch (type) {
+      case AdminSettings.conversationTypeSupport: // 'admin_user'
+        return Icons.support_agent;
+      case AdminSettings.conversationTypeProvider: // 'user_service_provider'
+        return Icons.business;
+      case AdminSettings.conversationTypeUser: // 'user_user'
+        return Icons.person;
+      default:
+        return Icons.person;
+    }
+  }
+
+  Color _getConversationColor(String type) {
+    switch (type) {
+      case AdminSettings.conversationTypeSupport:
+        return Colors.blue;
+      case AdminSettings.conversationTypeProvider:
+        return Colors.green;
+      case AdminSettings.conversationTypeUser:
+        return AppColors.primaryColor;
+      default:
+        return AppColors.primaryColor;
+    }
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'open':
+        return Colors.green;
+      case 'closed':
+        return Colors.red;
+      case 'archived':
+        return Colors.grey;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _getFilterLabel(String filter) {
+    switch (filter) {
+      case 'unread':
+        return 'غير مقروءة';
+      case 'support':
+        return 'الدعم الفني';
+      case 'private':
+        return 'محادثات خاصة';
+      default:
+        return filter;
     }
   }
 }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:saba2v2/models/order_model.dart';
 import 'package:saba2v2/services/order_service.dart';
@@ -82,10 +83,20 @@ class RestaurantOrderProvider with ChangeNotifier {
       }
       
     } catch (e) {
-      if (!silent) {
-        _error = e.toString();
-      }
       debugPrint("RestaurantOrderProvider Error: $e");
+      
+      if (!silent) {
+        // معالجة أنواع مختلفة من الأخطاء
+        if (e is SocketException || e.toString().contains('NetworkException')) {
+          _error = 'تعذر الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت';
+        } else if (e is TimeoutException) {
+          _error = 'انتهت مهلة الاتصال. يرجى المحاولة مرة أخرى';
+        } else if (e is FormatException) {
+          _error = 'خطأ في تنسيق البيانات المستلمة';
+        } else {
+          _error = 'حدث خطأ أثناء جلب الطلبات: ${e.toString()}';
+        }
+      }
     } finally {
       if (!silent) {
         _isLoading = false;

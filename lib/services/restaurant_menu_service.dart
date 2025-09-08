@@ -6,9 +6,10 @@ import 'package:saba2v2/models/MenuSection.dart';
 import 'package:saba2v2/models/MenuItem.dart';
 import 'package:saba2v2/services/auth_service.dart';
 import 'package:saba2v2/services/image_upload_service.dart';
+import '../config/constants.dart';
 
 class RestaurantMenuService {
-  final String _baseUrl = 'http://192.168.1.7:8000';
+  final String _baseUrl = AppConstants.baseUrl;
   final AuthService _authService = AuthService();
   final ImageUploadService _imageUploadService = ImageUploadService();
 
@@ -52,7 +53,7 @@ class RestaurantMenuService {
   Future<MenuItem> addMenuItem({required int sectionId, required String name, required String description, required double price, required File imageFile}) async {
     final token = await _authService.getToken();
     if (token == null) throw Exception('User not authenticated');
-    final restaurantId = await _authService.getRealEstateId();
+    final restaurantId = await _authService.getRestaurantId();
     if (restaurantId == null) throw Exception("Could not find restaurant ID.");
     final imageUrl = await _imageUploadService.uploadImage(imageFile);
     final uri = Uri.parse('$_baseUrl/api/menu-items');

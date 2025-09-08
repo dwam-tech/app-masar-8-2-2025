@@ -11,6 +11,7 @@ import 'package:http/http.dart' as http;
 import 'package:saba2v2/components/UI/image_picker_row.dart';
 import 'package:saba2v2/components/UI/section_title.dart';
 import 'package:saba2v2/providers/auth_provider.dart';
+import '../../../config/constants.dart';
 
 class DeliveryOfficeInformation extends StatefulWidget {
   const DeliveryOfficeInformation({super.key});
@@ -59,7 +60,7 @@ class _DeliveryOfficeInformationState extends State<DeliveryOfficeInformation> {
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
 
-  static const String _baseUrl = 'http://192.168.1.7:8000'; // استبدلي هذا بالـ URL الفعلي
+  static const String _baseUrl = AppConstants.baseUrl; // استبدلي هذا بالـ URL الفعلي
 
   @override
   void dispose() {
@@ -199,25 +200,74 @@ Future<String?> _uploadFile(String filePath, String fieldName) async {
   Future<void> _onSubmit() async {
     if (_isLoading) return;
 
+    // إلغاء التركيز من جميع الحقول
+    FocusScope.of(context).unfocus();
+
     if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('الرجاء تعبئة كل الحقول المطلوبة بشكل صحيح')),
+        const SnackBar(
+          content: Text('الرجاء تعبئة كل الحقول المطلوبة بشكل صحيح'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+    
+    // التحقق من تطابق كلمة المرور
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('كلمتا المرور غير متطابقتين'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+    
+    // التحقق من اختيار المحافظة
+    if (_selectedCity == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('الرجاء اختيار المحافظة'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
       );
       return;
     }
     
     if (!_selectedPaymentMethods.contains(true)) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يجب اختيار طريقة دفع واحدة على الأقل')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يجب اختيار طريقة دفع واحدة على الأقل'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
       return;
     }
 
     if (!_selectedRentalTypes.contains(true)) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يجب اختيار نوع تأجير واحد على الأقل')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يجب اختيار نوع تأجير واحد على الأقل'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
       return;
     }
 
     if (_logoUrl == null || _commercialFrontUrl == null || _commercialBackUrl == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('الرجاء رفع شعار المكتب وصور السجل التجاري')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('الرجاء رفع شعار المكتب وصور السجل التجاري'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
       return;
     }
 
@@ -225,6 +275,11 @@ Future<String?> _uploadFile(String filePath, String fieldName) async {
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // التحقق من وجود AuthProvider
+      if (authProvider == null) {
+        throw Exception('خدمة المصادقة غير متاحة');
+      }
 
       final result = await authProvider.registerDeliveryOffice(
         fullName: _fullNameController.text.trim(),
@@ -245,20 +300,58 @@ Future<String?> _uploadFile(String filePath, String fieldName) async {
 
       if (!mounted) return;
 
+      // التحقق من صحة الاستجابة
+      if (result == null) {
+        throw Exception('لم يتم استلام استجابة من الخادم');
+      }
+
       if (result['status'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم إنشاء الحساب بنجاح'), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text('تم إنشاء الحساب بنجاح'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
         );
-        context.go('/delivery-homescreen');
+        context.go('/login');
       } else {
+        final errorMessage = result['message'] ?? 'حدث خطأ أثناء التسجيل';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message'] ?? 'حدث خطأ أثناء التسجيل')),
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } on FormatException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في تنسيق البيانات: ${e.message}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } on Exception catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('حدث خطأ فادح: ${e.toString()}')),
+          const SnackBar(
+            content: Text('حدث خطأ غير متوقع، الرجاء المحاولة مرة أخرى'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 4),
+          ),
         );
       }
     } finally {
@@ -267,26 +360,49 @@ Future<String?> _uploadFile(String filePath, String fieldName) async {
   }
 
   String? _validateRequiredField(String? value, String fieldName) {
-    if (value == null || value.isEmpty) return '$fieldName مطلوب';
+    if (value == null || value.trim().isEmpty) return '$fieldName مطلوب';
+    if (value.trim().length > 100) return '$fieldName يجب أن يكون أقل من 100 حرف';
+    return null;
+  }
+
+  String? _validateFullName(String? value) {
+    if (value == null || value.trim().isEmpty) return 'الاسم الكامل مطلوب';
+    if (value.trim().length < 2) return 'الاسم يجب أن يكون حرفين على الأقل';
+    if (value.trim().length > 50) return 'الاسم يجب أن يكون أقل من 50 حرف';
+    final nameRegex = RegExp(r'^[\u0600-\u06FF\s]+$');
+    if (!nameRegex.hasMatch(value.trim())) return 'الاسم يجب أن يحتوي على أحرف عربية فقط';
     return null;
   }
 
   String? _validateEmail(String? value) {
-    if (value == null || value.isEmpty) return 'البريد الإلكتروني مطلوب';
+    if (value == null || value.trim().isEmpty) return 'البريد الإلكتروني مطلوب';
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-    if (!emailRegex.hasMatch(value)) return 'يرجى إدخال بريد إلكتروني صحيح';
+    if (!emailRegex.hasMatch(value.trim())) return 'يرجى إدخال بريد إلكتروني صحيح';
     return null;
   }
 
   String? _validatePhone(String? value) {
-    if (value == null || value.isEmpty) return 'رقم الهاتف مطلوب';
-    if (value.length < 10) return 'رقم الهاتف غير صالح';
+    if (value == null || value.trim().isEmpty) return 'رقم الهاتف مطلوب';
+    final cleanPhone = value.trim().replaceAll(RegExp(r'[\s\-\(\)]'), '');
+    final phoneRegex = RegExp(r'^(010|011|012|015)\d{8}$');
+    final phoneWithCountryCode = RegExp(r'^(\+2010|\+2011|\+2012|\+2015)\d{8}$');
+    final phoneWithZeros = RegExp(r'^(0020010|0020011|0020012|0020015)\d{8}$');
+    
+    if (!phoneRegex.hasMatch(cleanPhone) && 
+        !phoneWithCountryCode.hasMatch(cleanPhone) && 
+        !phoneWithZeros.hasMatch(cleanPhone)) {
+      return 'يرجى إدخال رقم هاتف مصري صحيح';
+    }
     return null;
   }
 
   String? _validatePassword(String? value) {
     if (value == null || value.isEmpty) return 'كلمة المرور مطلوبة';
-    if (value.length < 6) return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
+    if (value.length < 8) return 'كلمة المرور يجب أن تكون 8 أحرف على الأقل';
+    if (value.length > 50) return 'كلمة المرور يجب أن تكون أقل من 50 حرف';
+    if (!RegExp(r'^(?=.*[a-zA-Z])(?=.*\d)').hasMatch(value)) {
+      return 'كلمة المرور يجب أن تحتوي على أحرف وأرقام';
+    }
     return null;
   }
 
@@ -297,8 +413,29 @@ Future<String?> _uploadFile(String filePath, String fieldName) async {
   }
 
   String? _validateNumberField(String? value, String fieldName) {
-    if (value == null || value.isEmpty) return '$fieldName مطلوب';
-    if (double.tryParse(value) == null) return '$fieldName يجب أن يكون رقماً صحيحاً';
+    if (value == null || value.trim().isEmpty) return '$fieldName مطلوب';
+    final number = double.tryParse(value.trim());
+    if (number == null) return '$fieldName يجب أن يكون رقماً صحيحاً';
+    if (number < 0) return '$fieldName يجب أن يكون رقماً موجباً';
+    if (number > 10000) return '$fieldName كبير جداً';
+    return null;
+  }
+
+  String? _validatePositiveNumberField(String? value, String fieldName) {
+    if (value == null || value.trim().isEmpty) return '$fieldName مطلوب';
+    final number = double.tryParse(value.trim());
+    if (number == null) return '$fieldName يجب أن يكون رقماً صحيحاً';
+    if (number <= 0) return '$fieldName يجب أن يكون أكبر من صفر';
+    if (number > 10000) return '$fieldName كبير جداً';
+    return null;
+  }
+
+  String? _validateIntegerField(String? value, String fieldName) {
+    if (value == null || value.trim().isEmpty) return '$fieldName مطلوب';
+    final number = int.tryParse(value.trim());
+    if (number == null) return '$fieldName يجب أن يكون رقماً صحيحاً';
+    if (number < 1) return '$fieldName يجب أن يكون أكبر من صفر';
+    if (number > 1000) return '$fieldName كبير جداً';
     return null;
   }
 
@@ -409,7 +546,7 @@ Future<String?> _uploadFile(String filePath, String fieldName) async {
                       _buildTextField(
                         controller: _fullNameController,
                         hintText: 'الاسم كامل',
-                        validator: (value) => _validateRequiredField(value, 'الاسم'),
+                        validator: _validateFullName,
                       ),
                       _buildTextField(
                         controller: _emailController,
@@ -523,7 +660,7 @@ Future<String?> _uploadFile(String filePath, String fieldName) async {
                       _buildTextField(
                         controller: _deliveryCostPerKmController,
                         hintText: 'تكلفة الكيلو متر',
-                        validator: (value) => _validateNumberField(value, 'تكلفة الكيلو متر'),
+                        validator: (value) => _validatePositiveNumberField(value, 'تكلفة الكيلو متر'),
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
                       ),
@@ -537,7 +674,7 @@ Future<String?> _uploadFile(String filePath, String fieldName) async {
                       _buildTextField(
                         controller: _maxKmPerDayController,
                         hintText: 'أقصى عدد كيلو مترات مسموح في اليوم',
-                        validator: (value) => _validateNumberField(value, 'أقصى عدد كيلو مترات'),
+                        validator: (value) => _validateIntegerField(value, 'أقصى عدد كيلو مترات'),
                         keyboardType: TextInputType.number,
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       ),

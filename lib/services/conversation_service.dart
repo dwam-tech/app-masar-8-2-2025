@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../models/conversation_model.dart';
 import '../models/message_model.dart';
 import '../utils/constants.dart';
+import '../config/admin_settings.dart';
 
 class ConversationService {
   /// جلب أو إنشاء محادثة المستخدم مع الأدمن
@@ -11,23 +12,29 @@ class ConversationService {
     required String token,
   }) async {
     debugPrint('🌐 ConversationService: Starting getUserConversation');
-    debugPrint('🔗 API URL: ${Constants.baseUrl}/api/chat');
+    final uri = Uri.parse('${Constants.baseUrl}/api/conversations');
+    debugPrint('🔗 API URL: $uri');
     
     try {
-      final response = await http.get(
-        Uri.parse('${Constants.baseUrl}/api/chat'),
+      final response = await http.post(
+        uri,
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
+        body: jsonEncode({
+          'participant_email': AdminSettings.supportAdminEmail,
+          'type': AdminSettings.conversationTypeSupport,
+          'title': AdminSettings.supportChatTitle,
+        }),
       );
 
       debugPrint('📡 HTTP Response received:');
       debugPrint('   - Status Code: ${response.statusCode}');
       debugPrint('   - Response Body: ${response.body}');
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         final jsonData = json.decode(response.body);
         debugPrint('📋 Parsed JSON: $jsonData');
         
@@ -35,8 +42,6 @@ class ConversationService {
         debugPrint('✅ ConversationResponse created successfully');
         debugPrint('   - Status: ${conversationResponse.status}');
         debugPrint('   - Has conversation: ${conversationResponse.conversation != null}');
-        debugPrint('   - Messages count: ${conversationResponse.conversation?.messages?.length ?? 0}');
-        
         return conversationResponse;
       } else {
         debugPrint('❌ HTTP Error: ${response.statusCode}');
@@ -53,9 +58,26 @@ class ConversationService {
   static Future<MessageSendResponse?> sendUserMessage({
     required String token,
     required String content,
+    int? conversationId,
   }) async {
     try {
-      final url = Uri.parse('${Constants.baseUrl}/api/chat');
+      int? targetConversationId = conversationId;
+
+      // في حال لم يتم تمرير معرف المحادثة، نحاول جلب/إنشاء محادثة الدعم أولاً
+      if (targetConversationId == null) {
+        final convRes = await getUserConversation(token: token);
+        if (convRes != null && convRes.status && convRes.conversation?.id != null) {
+          targetConversationId = convRes.conversation!.id;
+        } else {
+          debugPrint('Error: Unable to obtain support conversation');
+          return MessageSendResponse(
+            status: false,
+            errorMessage: 'تعذر الحصول على محادثة الدعم',
+          );
+        }
+      }
+
+      final url = Uri.parse('${Constants.baseUrl}/api/conversations/$targetConversationId/messages');
       final response = await http.post(
         url,
         headers: {
@@ -87,17 +109,19 @@ class ConversationService {
     }
   }
 
-  /// تحديث حالة قراءة الرسائل (إذا كان مطلوباً)
+  /// تحديد جميع رسائل المحادثة كمقروءة
   static Future<bool> markMessagesAsRead({
     required String token,
+    required int conversationId,
   }) async {
     try {
-      final url = Uri.parse('${Constants.baseUrl}/api/chat/mark-read');
+      final url = Uri.parse('${Constants.baseUrl}/api/conversations/$conversationId/mark-all-read');
       final response = await http.post(
         url,
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
+          'Content-Type': 'application/json',
         },
       );
 

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:saba2v2/providers/auth_provider.dart';
+import 'package:saba2v2/main.dart' show registerDeviceToken, hookTokenRefresh;
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -20,22 +21,30 @@ class _LoginScreenState extends State<LoginScreen> {
 
   // --- هذه هي الدالة النهائية والمعدلة ---
   Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    // التحقق من صحة النموذج
+    if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    // تنظيف البيانات المدخلة
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    setState(() => _isLoading = true);
 
     try {
-      final authProvider = context.read<AuthProvider>();
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
       final result = await authProvider.login(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
+        email: email,
+        password: password,
       );
 
       if (!mounted) return;
+
+      // التحقق من صحة الاستجابة
+      if (result == null) {
+        _showMessage('لم يتم الحصول على استجابة من السيرفر', isError: true);
+        return;
+      }
 
       if (result['status'] == true) {
         final user = result['user'];
@@ -46,6 +55,17 @@ class _LoginScreenState extends State<LoginScreen> {
 
         final userType = user['user_type'];
         _showMessage('تم تسجيل الدخول بنجاح');
+        
+        // FCM: تسجيل Device Token بعد تسجيل الدخول الناجح
+        try {
+          final authProvider = Provider.of<AuthProvider>(context, listen: false);
+          if (authProvider.token != null) {
+            await registerDeviceToken(authProvider.token!);
+            hookTokenRefresh(authProvider.token!);
+          }
+        } catch (e) {
+          debugPrint('[FCM] Failed to register device token after login: $e');
+        }
 
         // منطق التوجيه بناءً على نوع المستخدم
         switch (userType) {
@@ -56,7 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
             context.go('/RealStateHomeScreen');
             break;
           case 'real_estate_individual':
-            context.go('/RealStateHomeScreen'); // أو أي شاشة أخرى
+            context.go('/RealStateHomeScreen');
             break;
           case 'restaurant':
             context.go('/restaurant-home');
@@ -65,7 +85,7 @@ class _LoginScreenState extends State<LoginScreen> {
             context.go('/delivery-homescreen');
             break;
           case 'driver':
-            context.go('/delivery-homescreen'); // أو أي شاشة أخرى
+            context.go('/delivery-homescreen');
             break;
           default:
             _showMessage('نوع المستخدم غير معروف: $userType', isError: true);
@@ -73,10 +93,19 @@ class _LoginScreenState extends State<LoginScreen> {
             break;
         }
       } else {
-        _showMessage(result['message'] ?? 'البريد الإلكتروني أو كلمة المرور غير صحيحة', isError: true);
+        String errorMessage = 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
+        if (result['message'] != null && result['message'].toString().isNotEmpty) {
+          errorMessage = result['message'].toString();
+        }
+        _showMessage(errorMessage, isError: true);
       }
+    } on Exception catch (e) {
+      debugPrint('Login Exception: $e');
+      String errorMessage = e.toString().replaceFirst('Exception: ', '');
+      _showMessage(errorMessage, isError: true);
     } catch (e) {
-      _showMessage('حدث خطأ أثناء تسجيل الدخول. يرجى المحاولة لاحقًا', isError: true);
+      debugPrint('Login Error: $e');
+      _showMessage('حدث خطأ غير متوقع. يرجى المحاولة لاحقًا', isError: true);
     } finally {
       if (mounted) {
         setState(() {
@@ -105,6 +134,83 @@ class _LoginScreenState extends State<LoginScreen> {
       isScrollControlled: true,
       builder: (context) => const AccountTypeBottomSheet(),
     );
+  }
+
+  void _showGoogleSignInDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                Image.asset('assets/icons/google.png', width: 24, height: 24),
+                const SizedBox(width: 8),
+                const Text('تسجيل الدخول عبر جوجل', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            content: const Text(
+              'التسجيل عبر جوجل مخصص للمستخدمين فقط وليس لمقدمي الخدمة.\n\nسيتم إنشاء حساب جديد إذا كانت هذه المرة الأولى، أو تسجيل الدخول إذا كان لديك حساب بالفعل.',
+              style: TextStyle(fontSize: 14, height: 1.5),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('إلغاء', style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _handleGoogleSignIn();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFEA4335),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('متابعة'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await authProvider.signInWithGoogle();
+
+      if (mounted && authProvider.isAuthenticated) {
+        _showMessage('تم تسجيل الدخول بنجاح');
+        context.go('/UserHomeScreen');
+      }
+    } catch (e) {
+      if (mounted) {
+        String errorMessage = 'فشل في تسجيل الدخول عبر جوجل';
+        if (e.toString().contains('sign_in_canceled')) {
+          errorMessage = 'تم إلغاء تسجيل الدخول';
+        } else if (e.toString().contains('network_error')) {
+          errorMessage = 'خطأ في الاتصال بالإنترنت';
+        } else if (e.toString().contains('sign_in_failed')) {
+          errorMessage = 'فشل في تسجيل الدخول، يرجى المحاولة مرة أخرى';
+        }
+        _showMessage(errorMessage, isError: true);
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -167,7 +273,12 @@ class _LoginScreenState extends State<LoginScreen> {
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                           ),
                           validator: (value) {
-                            if (value == null || value.trim().isEmpty || !value.contains('@')) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'الرجاء إدخال البريد الإلكتروني';
+                            }
+                            // التحقق من صحة البريد الإلكتروني
+                            final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                            if (!emailRegex.hasMatch(value.trim())) {
                               return 'الرجاء إدخال بريد إلكتروني صحيح';
                             }
                             return null;
@@ -197,6 +308,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'الرجاء إدخال كلمة المرور';
+                            }
+                            if (value.length < 8) {
+                              return 'كلمة المرور يجب أن تكون 8 أحرف على الأقل';
                             }
                             return null;
                           },
@@ -231,7 +345,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             const SizedBox(width: 10),
                             Expanded(
                               child: OutlinedButton.icon(
-                                onPressed: () {},
+                                onPressed: _showGoogleSignInDialog,
                                 icon: Image.asset('assets/icons/google.png', width: 22, height: 22),
                                 label: const Text('جوجل', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
                                 style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFFEA4335), side: const BorderSide(color: Color(0xFFEA4335), width: 2), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)), padding: const EdgeInsets.symmetric(vertical: 15)),

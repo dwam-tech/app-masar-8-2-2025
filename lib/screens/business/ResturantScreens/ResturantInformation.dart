@@ -11,6 +11,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
 import 'package:saba2v2/components/UI/section_title.dart';
 import 'package:saba2v2/screens/business/ResturantScreens/ResturantLawData.dart';
+import '../../../config/constants.dart';
 
 class RestaurantAccountInfo {
   final String username;
@@ -102,7 +103,7 @@ class _ResturantInformationState extends State<ResturantInformation> {
   final List<String> _cuisineTypes = const ['غربي', 'ايطالي', 'شرقي', 'صيني', 'هندي'];
   List<bool> _selectedCuisineTypes = [false, false, false, false, false];
   
-  static const String _baseUrl = 'http://192.168.1.7:8000';
+  static const String _baseUrl = AppConstants.baseUrl;
   static const Map<String, List<String>> _governorates = {
     'القاهرة': ['15 مايو', 'الازبكية', 'البساتين', 'التبين', 'الخليفة', 'الدراسة', 'الدرب الاحمر', 'الزاوية الحمراء', 'الزيتون', 'الساحل', 'السلام', 'السيدة زينب', 'الشرابية', 'مدينة الشروق', 'الظاهر', 'العتبة', 'القاهرة الجديدة', 'المرج', 'عزبة النخل', 'المطرية', 'المعادى', 'المعصرة', 'المقطم', 'المنيل', 'الموسكى', 'النزهة', 'الوايلى', 'باب الشعرية', 'بولاق', 'جاردن سيتى', 'حدائق القبة', 'حلوان', 'دار السلام', 'شبرا', 'طره', 'عابدين', 'عباسية', 'عين شمس', 'مدينة نصر', 'مصر الجديدة', 'مصر القديمة', 'منشية ناصر', 'مدينة بدر', 'مدينة العبور', 'وسط البلد', 'الزمالك', 'قصر النيل', 'الرحاب', 'القطامية', 'مدينتي', 'روض الفرج', 'شيراتون', 'الجمالية', 'العاشر من رمضان', 'الحلمية', 'النزهة الجديدة', 'العاصمة الإدارية'],
     'الجيزة': ['الجيزة', 'السادس من أكتوبر', 'الشيخ زايد', 'الحوامدية', 'البدرشين', 'الصف', 'أطفيح', 'العياط', 'الباويطي', 'منشأة القناطر', 'أوسيم', 'كرداسة', 'أبو النمرس', 'كفر غطاطي', 'منشأة البكاري', 'الدقى', 'العجوزة', 'الهرم', 'الوراق', 'امبابة', 'بولاق الدكرور', 'الواحات البحرية', 'العمرانية', 'المنيب', 'بين السرايات', 'الكيت كات', 'المهندسين', 'فيصل', 'أبو رواش', 'حدائق الأهرام', 'الحرانية', 'حدائق اكتوبر', 'صفط اللبن', 'القرية الذكية', 'ارض اللواء'],
@@ -144,10 +145,119 @@ class _ResturantInformationState extends State<ResturantInformation> {
     super.dispose();
   }
   
+  // Validation functions
+  String? _validateRequiredField(String? value, {int maxLength = 100}) {
+    if (value == null || value.trim().isEmpty) {
+      return 'هذا الحقل مطلوب';
+    }
+    if (value.trim().length > maxLength) {
+      return 'يجب ألا يتجاوز النص $maxLength حرف';
+    }
+    return null;
+  }
+
+  String? _validateUsername(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'يجب إدخال اسم المستخدم';
+    }
+    if (value.trim().length < 3 || value.trim().length > 20) {
+      return 'اسم المستخدم يجب أن يكون بين 3-20 حرف';
+    }
+    if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(value.trim())) {
+      return 'اسم المستخدم يجب أن يحتوي على أحرف وأرقام فقط';
+    }
+    return null;
+  }
+
+  String? _validateRestaurantName(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'يجب إدخال اسم المطعم';
+    }
+    if (value.trim().length < 2 || value.trim().length > 50) {
+      return 'اسم المطعم يجب أن يكون بين 2-50 حرف';
+    }
+    return null;
+  }
+
+  String? _validateEmail(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'يجب إدخال البريد الإلكتروني';
+    }
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
+      return 'البريد الإلكتروني غير صحيح';
+    }
+    return null;
+  }
+
+  String? _validatePhone(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'يجب إدخال رقم الهاتف';
+    }
+    String phone = value.trim().replaceAll(RegExp(r'[\s\-\(\)]'), '');
+    if (phone.startsWith('+2')) {
+      phone = phone.substring(2);
+    } else if (phone.startsWith('002')) {
+      phone = phone.substring(3);
+    }
+    if (!RegExp(r'^(010|011|012|015)\d{8}$').hasMatch(phone)) {
+      return 'رقم الهاتف غير صحيح (يجب أن يبدأ بـ 010, 011, 012, أو 015)';
+    }
+    return null;
+  }
+
   String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) return 'يجب إدخال كلمة المرور';
-    if (value.length < 6) return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
-    if (value != _confirmPasswordController.text) return 'كلمات المرور غير متطابقة';
+    if (value == null || value.isEmpty) {
+      return 'يجب إدخال كلمة المرور';
+    }
+    if (value.length < 8) {
+      return 'كلمة المرور يجب أن تكون 8 أحرف على الأقل';
+    }
+    if (!RegExp(r'^(?=.*[a-zA-Z])(?=.*\d)').hasMatch(value)) {
+      return 'كلمة المرور يجب أن تحتوي على أحرف وأرقام';
+    }
+    return null;
+  }
+
+  String? _validateConfirmPassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'يجب تأكيد كلمة المرور';
+    }
+    if (value != _passwordController.text) {
+      return 'كلمات المرور غير متطابقة';
+    }
+    return null;
+  }
+
+  String? _validateDeliveryCost(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return null; // Optional field
+    }
+    final cost = double.tryParse(value.trim());
+    if (cost == null || cost < 0) {
+      return 'يجب إدخال رقم صحيح أكبر من أو يساوي صفر';
+    }
+    return null;
+  }
+
+  String? _validateDepositAmount(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return null; // Optional field
+    }
+    final amount = double.tryParse(value.trim());
+    if (amount == null || amount < 0) {
+      return 'يجب إدخال رقم صحيح أكبر من أو يساوي صفر';
+    }
+    return null;
+  }
+
+  String? _validateMaxPeople(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return null; // Optional field
+    }
+    final people = int.tryParse(value.trim());
+    if (people == null || people < 1) {
+      return 'يجب إدخال رقم صحيح أكبر من صفر';
+    }
     return null;
   }
 
@@ -206,28 +316,105 @@ class _ResturantInformationState extends State<ResturantInformation> {
   }
 
   void _submitForm() {
-    if (_formKey.currentState!.validate()) {
-      if (_branches.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يجب إضافة فرع واحد على الأقل')));
-        return;
-      }
-      if (_restaurantLogoUrl == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('الرجاء اختيار شعار المطعم')));
-        return;
-      }
+    // Unfocus all fields
+    FocusScope.of(context).unfocus();
 
+    // Validate form
+    if (!_formKey.currentState!.validate()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يرجى تصحيح الأخطاء في النموذج'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+
+    // Check branches
+    if (_branches.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يجب إضافة فرع واحد على الأقل'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+
+    // Check restaurant logo
+    if (_restaurantLogoUrl == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('الرجاء اختيار شعار المطعم'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+
+    // Check cuisine types selection
+    if (!_selectedCuisineTypes.any((selected) => selected)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يجب اختيار نوع مطبخ واحد على الأقل'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+
+    // Check delivery service validation
+    if (_hasDeliveryService && _deliveryCostPerKmController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يجب إدخال تكلفة التوصيل عند تفعيل خدمة التوصيل'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+
+    // Check deposit validation
+    if (_wantsDeposit && _depositAmountController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يجب إدخال مبلغ العربون عند تفعيل خيار العربون'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+
+    // Check max people validation
+    if (_hasTableReservation && _maxPeopleController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يجب إدخال الحد الأقصى للأفراد عند تفعيل حجز الطاولات'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+
+    try {
       final accountInfo = RestaurantAccountInfo(
-        username: _usernameController.text,
-      
-        phone: _phoneController.text,
-        email: _emailController.text,
+        username: _usernameController.text.trim(),
+        phone: _phoneController.text.trim(),
+        email: _emailController.text.trim(),
         password: _passwordController.text,
-        restaurantName: _restaurantNameController.text,
+        restaurantName: _restaurantNameController.text.trim(),
         restaurantLogo: _restaurantLogoUrl,
-        deliveryCostPerKm: _deliveryCostPerKmController.text.isEmpty ? null : _deliveryCostPerKmController.text,
-        depositAmount: _depositAmountController.text.isEmpty ? null : _depositAmountController.text,
-        maxPeople: _maxPeopleController.text.isEmpty ? null : _maxPeopleController.text,
-        notes: _notesController.text.isEmpty ? null : _notesController.text,
+        deliveryCostPerKm: _deliveryCostPerKmController.text.trim().isEmpty ? null : _deliveryCostPerKmController.text.trim(),
+        depositAmount: _depositAmountController.text.trim().isEmpty ? null : _depositAmountController.text.trim(),
+        maxPeople: _maxPeopleController.text.trim().isEmpty ? null : _maxPeopleController.text.trim(),
+        notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
         hasDeliveryService: _hasDeliveryService,
         hasTableReservation: _hasTableReservation,
         wantsDeposit: _wantsDeposit,
@@ -242,6 +429,14 @@ class _ResturantInformationState extends State<ResturantInformation> {
         'legal_data': widget.legalData,
         'account_info': accountInfo,
       });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('حدث خطأ غير متوقع: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
     }
   }
   
@@ -266,7 +461,7 @@ class _ResturantInformationState extends State<ResturantInformation> {
               ),
               contentPadding: const EdgeInsets.symmetric(vertical: 15.0, horizontal: 20.0),
             ),
-            validator: (value) => value!.isEmpty ? 'يجب إدخال اسم المطعم' : null,
+            validator: _validateRestaurantName,
           ),
         ],
       ),
@@ -314,8 +509,9 @@ class _ResturantInformationState extends State<ResturantInformation> {
               labelText: 'اسم المستخدم',
               prefixIcon: const Icon(Icons.person),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             ),
-            validator: (value) => value!.isEmpty? 'يجب إدخال اسم المستخدم' : null,
+            validator: _validateUsername,
           ),
           const SizedBox(height: 16),
           TextFormField(
@@ -326,8 +522,9 @@ class _ResturantInformationState extends State<ResturantInformation> {
               labelText: 'رقم الهاتف',
               prefixIcon: const Icon(Icons.phone),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             ),
-            validator: (value) => value!.isEmpty ? 'يجب إدخال رقم الهاتف' : null,
+            validator: _validatePhone,
           ),
           const SizedBox(height: 16),
           TextFormField(
@@ -338,8 +535,9 @@ class _ResturantInformationState extends State<ResturantInformation> {
               labelText: 'البريد الإلكتروني',
               prefixIcon: const Icon(Icons.email),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             ),
-            validator: (value) => value!.contains('@') ? null : 'بريد إلكتروني غير صالح',
+            validator: _validateEmail,
           ),
           const SizedBox(height: 16),
           TextFormField(
@@ -350,6 +548,7 @@ class _ResturantInformationState extends State<ResturantInformation> {
               labelText: 'كلمة المرور',
               prefixIcon: const Icon(Icons.lock),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             ),
             validator: _validatePassword,
           ),
@@ -362,8 +561,9 @@ class _ResturantInformationState extends State<ResturantInformation> {
               labelText: 'تأكيد كلمة المرور',
               prefixIcon: const Icon(Icons.lock_outline),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             ),
-            validator: _validatePassword,
+            validator: _validateConfirmPassword,
           ),
           const SizedBox(height: 24),
         ],
@@ -421,7 +621,7 @@ class _ResturantInformationState extends State<ResturantInformation> {
               decoration: const InputDecoration(labelText: 'سعر التوصيل لكل كيلومتر', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              validator: (value) => _hasDeliveryService && value!.isEmpty ? 'مطلوب' : null,
+              validator: _hasDeliveryService ? _validateDeliveryCost : null,
             ),
           ],
         ],
@@ -466,7 +666,7 @@ class _ResturantInformationState extends State<ResturantInformation> {
                 decoration: const InputDecoration(labelText: 'مبلغ العربون', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                validator: (value) => _wantsDeposit && value!.isEmpty ? 'مطلوب' : null,
+                validator: _wantsDeposit ? _validateDepositAmount : null,
               ),
             ],
             const SizedBox(height: 16),
@@ -476,7 +676,7 @@ class _ResturantInformationState extends State<ResturantInformation> {
               decoration: const InputDecoration(labelText: 'الحد الأقصى للأفراد', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              validator: (value) => _hasTableReservation && value!.isEmpty ? 'مطلوب' : null,
+              validator: _hasTableReservation ? _validateMaxPeople : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -503,7 +703,11 @@ class _ResturantInformationState extends State<ResturantInformation> {
           DropdownButtonFormField<String>(
             key: const ValueKey('governorate'),
             value: _selectedGovernorate,
-            decoration: InputDecoration(labelText: 'اختر المحافظة', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+            decoration: InputDecoration(
+              labelText: 'اختر المحافظة', 
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            ),
             items: _governorates.keys.map((String value) => DropdownMenuItem<String>(value: value, child: Text(value))).toList(),
             onChanged: (value) => setState(() { _selectedGovernorate = value; _selectedArea = null; }),
             validator: (value) => _branches.isEmpty && _selectedGovernorate == null ? 'يجب إضافة فرع واحد على الأقل' : null,
@@ -513,7 +717,11 @@ class _ResturantInformationState extends State<ResturantInformation> {
             DropdownButtonFormField<String>(
               key: ValueKey('area_$_selectedGovernorate'),
               value: _selectedArea,
-              decoration: InputDecoration(labelText: 'اختر المنطقة', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+              decoration: InputDecoration(
+                labelText: 'اختر المنطقة', 
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              ),
               items: availableAreas.map((String value) => DropdownMenuItem<String>(value: value, child: Text(value))).toList(),
               onChanged: (value) => setState(() => _selectedArea = value),
             ),

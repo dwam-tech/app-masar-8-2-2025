@@ -8,9 +8,12 @@ import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart'; // Added for debugPrint
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:saba2v2/components/UI/image_picker_row.dart';
 import 'package:saba2v2/components/UI/section_title.dart';
 import 'package:saba2v2/providers/auth_provider.dart';
+import '../../../config/constants.dart';
 
 class SubscriptionRegistrationOfficeScreen extends StatefulWidget {
   const SubscriptionRegistrationOfficeScreen({super.key});
@@ -25,6 +28,9 @@ class _SubscriptionRegistrationOfficeScreenState
   final _formKey = GlobalKey<FormState>();
   bool _includesVat = false;
   bool _isLoading = false; // Added for loading state
+  bool _isLoadingLocation = false; // Added for location loading state
+  bool _isPasswordVisible = true; // Password visibility toggle
+  bool _isConfirmPasswordVisible = true; // Confirm password visibility toggle
 
   // Controllers for text fields
   final TextEditingController _officeNameController = TextEditingController();
@@ -59,7 +65,7 @@ class _SubscriptionRegistrationOfficeScreenState
   ];
 
   // Base URL for the Laravel API
-  static const String _baseUrl = 'http://192.168.1.7:8000'; // Replace with your actual API base URL
+  static const String _baseUrl = AppConstants.baseUrl; // Replace with your actual API base URL
 
   Future<void> _pickFile(String fieldName) async {
     if (_isLoading) return; // Prevent picking new image during loading
@@ -247,21 +253,185 @@ class _SubscriptionRegistrationOfficeScreenState
     });
   }
 
+  // وظيفة للتحقق من صلاحيات الموقع
+  Future<bool> _handleLocationPermission() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    // التحقق من تفعيل خدمة الموقع
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('خدمة الموقع غير مفعلة. الرجاء تفعيلها من الإعدادات')),
+        );
+      }
+      return false;
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تم رفض صلاحية الوصول للموقع')),
+          );
+        }
+        return false;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('صلاحية الموقع مرفوضة نهائياً. الرجاء تفعيلها من إعدادات التطبيق')),
+        );
+      }
+      return false;
+    }
+
+    return true;
+  }
+
+  // وظيفة للحصول على الموقع الحالي
+  Future<void> _getCurrentLocation() async {
+    if (_isLoadingLocation || _isLoading) return;
+
+    final hasPermission = await _handleLocationPermission();
+    if (!hasPermission) return;
+
+    setState(() => _isLoadingLocation = true);
+
+    try {
+      // الحصول على الموقع الحالي
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 15),
+      );
+
+      debugPrint('Current Position: ${position.latitude}, ${position.longitude}');
+
+      // تحويل الإحداثيات إلى عنوان
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (placemarks.isNotEmpty) {
+        Placemark place = placemarks[0];
+        
+        // تكوين العنوان
+        String address = '';
+        if (place.street != null && place.street!.isNotEmpty) {
+          address += place.street!;
+        }
+        if (place.subLocality != null && place.subLocality!.isNotEmpty) {
+          if (address.isNotEmpty) address += '، ';
+          address += place.subLocality!;
+        }
+        if (place.locality != null && place.locality!.isNotEmpty) {
+          if (address.isNotEmpty) address += '، ';
+          address += place.locality!;
+        }
+        if (place.administrativeArea != null && place.administrativeArea!.isNotEmpty) {
+          if (address.isNotEmpty) address += '، ';
+          address += place.administrativeArea!;
+        }
+        if (place.country != null && place.country!.isNotEmpty) {
+          if (address.isNotEmpty) address += '، ';
+          address += place.country!;
+        }
+
+        // إذا لم نحصل على عنوان مفصل، نستخدم الإحداثيات
+        if (address.isEmpty) {
+          address = 'خط العرض: ${position.latitude.toStringAsFixed(6)}، خط الطول: ${position.longitude.toStringAsFixed(6)}';
+        }
+
+        setState(() {
+          _addressController.text = address;
+        });
+
+        debugPrint('Address: $address');
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تم الحصول على الموقع بنجاح'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        // في حالة عدم وجود عنوان، نستخدم الإحداثيات
+        String coordinates = 'خط العرض: ${position.latitude.toStringAsFixed(6)}، خط الطول: ${position.longitude.toStringAsFixed(6)}';
+        setState(() {
+          _addressController.text = coordinates;
+        });
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تم الحصول على الإحداثيات بنجاح'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error getting location: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('فشل في الحصول على الموقع: $e')),
+        );
+      }
+    } finally {
+      setState(() => _isLoadingLocation = false);
+    }
+  }
+
   Future<void> _submitForm() async {
     if (_isLoading) return; // Prevent multiple submissions
 
-    if (!_formKey.currentState!.validate()) return;
+    // إلغاء التركيز من جميع الحقول
+    FocusScope.of(context).unfocus();
 
-    if (_passwordController.text != _ConfirmPasswordController.text) {
-      if (context.mounted) {
-        debugPrint('Password Mismatch: كلمتا السر غير متطابقتين');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('كلمتا السر غير متطابقتين')),
-        );
-      }
+    if (!_formKey.currentState!.validate()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('الرجاء تعبئة كل الحقول المطلوبة بشكل صحيح'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
       return;
     }
 
+    // التحقق من تطابق كلمة المرور
+    if (_passwordController.text != _ConfirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('كلمتا المرور غير متطابقتين'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+
+    // التحقق من اختيار المحافظة
+    if (_selectedCity == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('الرجاء اختيار المحافظة'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+
+    // التحقق من رفع جميع الصور المطلوبة
     if ([
       _officeLogoUrl,
       _ownerIdFrontImageUrl,
@@ -270,18 +440,26 @@ class _SubscriptionRegistrationOfficeScreenState
       _commercialRegisterFrontImageUrl,
       _commercialRegisterBackImageUrl
     ].any((url) => url == null)) {
-      if (context.mounted) {
-        debugPrint('Missing Images: الرجاء رفع جميع الصور');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('الرجاء رفع جميع الصور')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('الرجاء رفع جميع الصور المطلوبة'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
       return;
     }
 
     setState(() => _isLoading = true);
+    
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // التحقق من وجود AuthProvider
+      if (authProvider == null) {
+        throw Exception('خدمة المصادقة غير متاحة');
+      }
+      
       final result = await authProvider.registerRealstateOffice(
         username: _officeNameController.text.trim(),
         email: _emailController.text.trim(),
@@ -289,66 +467,161 @@ class _SubscriptionRegistrationOfficeScreenState
         phone: _phoneController.text.trim(),
         city: _selectedCity!,
         address: _addressController.text.trim(),
-        vat: true,
+        vat: _includesVat,
         officeLogoPath: _officeLogoUrl!,
         ownerIdFrontPath: _ownerIdFrontImageUrl!,
         ownerIdBackPath: _ownerIdBackImageUrl!,
         officeImagePath: _officeImageUrl!,
         commercialCardFrontPath: _commercialRegisterFrontImageUrl!,
         commercialCardBackPath: _commercialRegisterBackImageUrl!,
-      ).timeout(Duration(seconds: 30), onTimeout: () {
+      ).timeout(const Duration(seconds: 30), onTimeout: () {
         throw Exception('انتهت مهلة الاتصال. تأكد من اتصالك بالإنترنت');
       });
 
-      if (result['status']) {
-        if (context.mounted) {
-          debugPrint('Success: تم إنشاء الحساب بنجاح');
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('تم إنشاء الحساب بنجاح'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-        if (mounted) {
-          context.go('/RealStateHomeScreen');
-        }
-      } else {
-        if (context.mounted) {
-          debugPrint('Failure: ${result['message'] ?? 'حدث خطأ أثناء التسجيل'}');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(result['message'] ?? 'حدث خطأ أثناء التسجيل')),
-          );
-        }
+      if (!mounted) return;
+
+      // التحقق من صحة الاستجابة
+      if (result == null) {
+        throw Exception('لم يتم استلام استجابة من الخادم');
       }
-    } on SocketException {
-      if (context.mounted) {
-        debugPrint('SocketException: خطأ في الاتصال بالإنترنت. الرجاء المحاولة مرة أخرى');
+
+      if (result['status'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('خطأ في الاتصال بالإنترنت. الرجاء المحاولة مرة أخرى')),
+          const SnackBar(
+            content: Text('تم تسجيل المكتب بنجاح'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        context.go('/login');
+      } else {
+        final errorMessage = result['message'] ?? 'فشل التسجيل';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } on SocketException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('خطأ في الاتصال بالإنترنت. الرجاء المحاولة مرة أخرى'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+    } on FormatException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في تنسيق البيانات: ${e.message}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
         );
       }
     } on Exception catch (e) {
-      if (context.mounted) {
-        debugPrint('Exception: حدث خطأ: $e');
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('حدث خطأ: $e')),
+          SnackBar(
+            content: Text('خطأ: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('حدث خطأ غير متوقع، الرجاء المحاولة مرة أخرى'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 4),
+          ),
         );
       }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  // دوال validation محسنة
+  String? _validateRequiredField(String? value, String fieldName) {
+    if (value == null || value.trim().isEmpty) return '$fieldName مطلوب';
+    if (value.trim().length > 100) return '$fieldName طويل جداً (الحد الأقصى 100 حرف)';
+    return null;
+  }
+
+  String? _validateOfficeName(String? value) {
+    if (value == null || value.trim().isEmpty) return 'اسم المكتب مطلوب';
+    if (value.trim().length < 2) return 'اسم المكتب يجب أن يكون حرفين على الأقل';
+    if (value.trim().length > 50) return 'اسم المكتب طويل جداً (الحد الأقصى 50 حرف)';
+    return null;
+  }
+
+  String? _validateEmail(String? value) {
+    if (value == null || value.trim().isEmpty) return 'البريد الإلكتروني مطلوب';
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    if (!emailRegex.hasMatch(value.trim())) return 'البريد الإلكتروني غير صالح';
+    return null;
+  }
+
+  String? _validatePhone(String? value) {
+    if (value == null || value.trim().isEmpty) return 'رقم الهاتف مطلوب';
+    final cleanPhone = value.replaceAll(RegExp(r'[^0-9+]'), '');
+    
+    // Egyptian mobile number patterns (010, 011, 012, 015)
+    final patterns = [
+      RegExp(r'^01[0125][0-9]{8}$'), // Normal format: 01xxxxxxxxx
+      RegExp(r'^\+2001[0125][0-9]{8}$'), // With country code: +20xxxxxxxxxx
+      RegExp(r'^002001[0125][0-9]{8}$'), // With full country code: 00201xxxxxxxxx
+    ];
+    
+    bool isValid = patterns.any((pattern) => pattern.hasMatch(cleanPhone));
+    if (!isValid) return 'رقم الهاتف غير صحيح يجب ان يبدأ ب 010,011,012,015';
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) return 'كلمة المرور مطلوبة';
+    if (value.length < 8) return 'كلمة المرور يجب أن تكون 8 أحرف على الأقل';
+    if (!RegExp(r'^(?=.*[a-zA-Z])(?=.*[0-9])').hasMatch(value)) {
+      return 'كلمة المرور يجب أن تحتوي على أحرف وأرقام';
+    }
+    return null;
+  }
+
+  String? _validateConfirmPassword(String? value) {
+    if (value == null || value.isEmpty) return 'تأكيد كلمة المرور مطلوب';
+    if (value != _passwordController.text) return 'كلمات المرور غير متطابقة';
+    return null;
+  }
+
+  String? _validateAddress(String? value) {
+    if (value == null || value.trim().isEmpty) return 'العنوان مطلوب';
+    if (value.trim().length < 10) return 'العنوان قصير جداً (الحد الأدنى 10 أحرف)';
+    if (value.trim().length > 200) return 'العنوان طويل جداً (الحد الأقصى 200 حرف)';
+    return null;
   }
 
   Widget _buildFormField({
     required String hintText,
     required TextEditingController controller,
     bool obscureText = false,
+    bool isPassword = false,
+    VoidCallback? onToggleVisibility,
+    String? Function(String?)? validator,
+    TextInputType keyboardType = TextInputType.text,
   }) {
     return TextFormField(
       controller: controller,
       obscureText: obscureText,
       textAlign: TextAlign.right,
+      keyboardType: keyboardType,
       decoration: InputDecoration(
         hintText: hintText,
         filled: true,
@@ -361,9 +634,16 @@ class _SubscriptionRegistrationOfficeScreenState
           vertical: 15.0,
           horizontal: 20.0,
         ),
+        suffixIcon: isPassword ? IconButton(
+          icon: Icon(
+            obscureText ? Icons.visibility : Icons.visibility_off,
+            color: Colors.grey[600],
+          ),
+          onPressed: onToggleVisibility,
+        ) : null,
       ),
-      validator: (value) {
-        if (value == null || value.isEmpty) {
+      validator: validator ?? (value) {
+        if (value == null || value.trim().isEmpty) {
           return 'هذا الحقل مطلوب';
         }
         return null;
@@ -397,16 +677,66 @@ class _SubscriptionRegistrationOfficeScreenState
                   _buildFormField(
                     hintText: 'اسم المكتب',
                     controller: _officeNameController,
+                    validator: _validateOfficeName,
                   ),
                   const SizedBox(height: 16),
-                  _buildFormField(
-                    hintText: 'عنوان المكتب',
-                    controller: _addressController,
+                  // حقل عنوان المكتب مع زر الموقع
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextFormField(
+                        controller: _addressController,
+                        textAlign: TextAlign.right,
+                        maxLines: 3,
+                        decoration: InputDecoration(
+                          hintText: 'عنوان المكتب',
+                          filled: true,
+                          fillColor: Colors.grey[100],
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12.0),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 15.0,
+                            horizontal: 20.0,
+                          ),
+                          suffixIcon: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: IconButton(
+                              onPressed: (_isLoading || _isLoadingLocation) ? null : _getCurrentLocation,
+                              icon: _isLoadingLocation 
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.my_location, color: Colors.blue),
+                              tooltip: 'الحصول على الموقع الحالي',
+                            ),
+                          ),
+                        ),
+                        validator: _validateAddress,
+                      ),
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                        child: Text(
+                          'اضغط على أيقونة الموقع للحصول على موقعك الحالي تلقائياً',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                          textAlign: TextAlign.right,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   _buildFormField(
                     hintText: 'رقم الهاتف',
                     controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    validator: _validatePhone,
                   ),
                   const SizedBox(height: 16),
                   Directionality(
@@ -454,18 +784,34 @@ class _SubscriptionRegistrationOfficeScreenState
                   _buildFormField(
                     hintText: 'البريد الإلكتروني',
                     controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    validator: _validateEmail,
                   ),
                   const SizedBox(height: 16),
                   _buildFormField(
                     hintText: 'كلمة السر',
                     controller: _passwordController,
-                    obscureText: true,
+                    obscureText: _isPasswordVisible,
+                    isPassword: true,
+                    onToggleVisibility: () {
+                      setState(() {
+                        _isPasswordVisible = !_isPasswordVisible;
+                      });
+                    },
+                    validator: _validatePassword,
                   ),
                   const SizedBox(height: 16),
                   _buildFormField(
                     hintText: 'تأكيد كلمة السر',
                     controller: _ConfirmPasswordController,
-                    obscureText: true,
+                    obscureText: _isConfirmPasswordVisible,
+                    isPassword: true,
+                    onToggleVisibility: () {
+                      setState(() {
+                        _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
+                      });
+                    },
+                    validator: _validateConfirmPassword,
                   ),
                   const SizedBox(height: 24),
                   ImagePickerRow(
@@ -565,7 +911,7 @@ class _SubscriptionRegistrationOfficeScreenState
                           ),
                         ),
                         child: const Text(
-                          'التالي',
+                          'إنشاء حساب',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,

@@ -105,7 +105,11 @@ class _ResturantWorkTimeState extends State<ResturantWorkTime> {
   bool _validateTime(int dayIndex, TimeOfDay endTime) {
     if (_timeToDouble(endTime) <= _timeToDouble(_startTimes[dayIndex])) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('يجب أن يكون وقت النهاية بعد وقت البداية')),
+        const SnackBar(
+          content: Text('يجب أن يكون وقت النهاية بعد وقت البداية'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
       );
       return false;
     }
@@ -148,6 +152,19 @@ class _ResturantWorkTimeState extends State<ResturantWorkTime> {
 
   Future<void> _submitData() async {
     if (_isLoading) return;
+    
+    // التحقق من وجود يوم واحد على الأقل مفعل
+    if (!_activeDays.any((isActive) => isActive)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يجب تفعيل يوم واحد على الأقل من أيام العمل'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+    
     setState(() => _isLoading = true);
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -164,7 +181,7 @@ class _ResturantWorkTimeState extends State<ResturantWorkTime> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('تم تسجيل المطعم بنجاح!'), backgroundColor: Colors.green),
         );
-        context.go('/restaurant-home');
+        context.go('/login'); // تم تغيير التوجيه إلى صفحة تسجيل الدخول بدلاً من تسجيل الدخول التلقائي
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(result['message'] ?? 'فشل التسجيل')),

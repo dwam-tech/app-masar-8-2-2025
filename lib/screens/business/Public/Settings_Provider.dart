@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:saba2v2/providers/auth_provider.dart';
+import 'package:saba2v2/providers/conversation_provider.dart';
 
 class SettingsProvider extends StatefulWidget {
   const SettingsProvider({super.key});
@@ -11,6 +14,14 @@ class SettingsProvider extends StatefulWidget {
 
 class _SettingsProviderState extends State<SettingsProvider> {
   bool isArabic = true; // متغير لتتبع اللغة الحالية
+
+  Future<void> _logout(BuildContext context) async {
+    final conversationProvider = context.read<ConversationProvider>();
+    await context.read<AuthProvider>().logout(conversationProvider);
+    if (context.mounted) {
+      context.go('/login');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -162,7 +173,7 @@ class _SettingsProviderState extends State<SettingsProvider> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: () => context.go("/login"),
+                          onPressed: () => _logout(context),
                           icon: const Icon(Icons.logout, color: Colors.white, size: 20),
                           label: const Text(
                             "تسجيل الخروج",

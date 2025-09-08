@@ -19,15 +19,18 @@ class MenuItem {
 
   /// **النسخة النهائية المصححة لتطابق الـ JSON**
   factory MenuItem.fromJson(Map<String, dynamic> json) {
+    // تنظيف رابط الصورة من المسافات الإضافية
+    String cleanImageUrl = (json['image'] ?? '').toString().trim();
+    
     return MenuItem(
       id: json['id'] ?? 0,
       // **التصحيح: الخادم يرسل "section_id"**
       menuSectionId: json['section_id'] ?? 0, 
       // **التصحيح: الخادم يرسل "title"**
-      name: json['title'] ?? '', 
-      description: json['description'] ?? '',
-      // **التصحيح: الخادم يرسل "image"**
-      imageUrl: json['image'] ?? '', 
+      name: (json['title'] ?? '').toString().trim(), 
+      description: (json['description'] ?? '').toString().trim(),
+      // **التصحيح: الخادم يرسل "image" مع تنظيف المسافات**
+      imageUrl: cleanImageUrl, 
       price: double.tryParse(json['price'].toString()) ?? 0.0,
       // **التصحيح: الخادم لا يرسل هذا الحقل، لذا نعطيه قيمة افتراضية**
       isAvailable: json['is_available'] ?? true, 

@@ -872,6 +872,22 @@ class _RealStateHomeScreenState extends State<RealStateHomeScreen>
   }
 
   void _addProperty(BuildContext context) {
+    // التحقق من موافقة الإدمن على الحساب
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userData = authProvider.userData;
+    final isApproved = userData?['is_approved'] == 1 || userData?['is_approved'] == true;
+    
+    if (!isApproved) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يستلزم قبول الإدمن للحساب لإضافة عقار جديد'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+    
     final addressController = TextEditingController();
     final priceController = TextEditingController();
     final typeController = TextEditingController();
@@ -1681,6 +1697,7 @@ onPressed: () async {
                     isTablet: isTablet),
               ],
             ),
+           
             Text("الرئيسية",
                 style: TextStyle(
                     fontSize: isTablet ? 24.0 : 20.0,

@@ -5,9 +5,10 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/car_model.dart';
+import '../config/constants.dart';
 
 class CarApiService {
-  final String _baseUrl = "http://192.168.1.7:8000";
+  final String _baseUrl = AppConstants.baseUrl;
   final String _token;
 
   CarApiService({required String token}) : _token = token;
