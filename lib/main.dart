@@ -145,31 +145,29 @@ void main() async {
   FirebaseMessaging.onMessage.listen((RemoteMessage m) async {
     print('[FCM] onMessage: ${m.messageId} | ${m.notification?.title}');
 
-    // قمع الإشعار فقط إذا كان المستخدم فعليًا على شاشة المحادثة
+    // قمع الإشعار فقط إذا كان المستخدم فعليًا داخل شاشة نفس المحادثة
     bool suppress = false;
     final ctx = NavigationService.navigatorKey.currentContext;
     if (ctx != null) {
-      bool inChatRoute = false;
-      bool inChatProvider = false;
-      try {
-        final location = GoRouterState.of(ctx).uri.path;
-        inChatRoute = location.startsWith('/chat');
-        print('[FCM] Current route: $location | inChatRoute=$inChatRoute');
-      } catch (_) {}
       try {
         final convProv = Provider.of<ConversationProvider>(ctx, listen: false);
-        inChatProvider = convProv.isInChatScreen;
-        if (inChatProvider) {
-          // تحديث سريع للمحادثة دون انتظار
+        final bool inChat = convProv.isInChatScreen;
+        final String? currentConvId = convProv.conversation?.id?.toString();
+        final String? incomingConvId = (m.data['conversation_id'] ?? m.data['conversationId'])?.toString();
+
+        if (inChat && currentConvId != null && incomingConvId != null && incomingConvId == currentConvId) {
+          // المستخدم داخل نفس المحادثة الواردة - لا نعرض إشعار نظام ونحدّث الرسائل بصمت
+          suppress = true;
           // ignore: unawaited_futures
           convProv.refreshConversation();
         }
-      } catch (_) {}
-      suppress = inChatRoute || inChatProvider;
+      } catch (e) {
+        print('[FCM] Suppress check error: $e');
+      }
     }
 
     if (suppress) {
-      print('[FCM] Suppressed foreground notification (user in chat screen)');
+      print('[FCM] Suppressed foreground notification (user in the same chat)');
       return;
     }
 

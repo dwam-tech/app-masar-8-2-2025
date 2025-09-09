@@ -23,6 +23,8 @@ import 'package:saba2v2/providers/banner_provider.dart';
 import 'package:saba2v2/widgets/featured_properties_row.dart';
 import 'package:saba2v2/screens/all_restaurants_screen.dart';
 import 'package:saba2v2/screens/user/all_properties_screen.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 
 class UserHomeScreen extends StatefulWidget {
   const UserHomeScreen({super.key});
@@ -35,8 +37,8 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
   String _selectedCity = 'القاهرة'; // قيمة افتراضية
   final PageController _pageController = PageController();
   int _currentPage = 0;
-
-
+  
+  bool _locationChecked = false; // لمنع تكرار التحقق من الموقع
 
   static const List<String> _cities = [
     'القاهرة',
@@ -92,6 +94,12 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
         setState(() {
           _selectedCity = savedCity;
         });
+      }
+
+      // بعد تحديد المحافظة، تحقق من الموقع الحالي وقارن
+      if (!_locationChecked) {
+        _locationChecked = true;
+        _checkAndAutoUpdateCityFromLocation();
       }
     });
     
@@ -165,6 +173,141 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
         ),
       );
     }
+  }
+
+  // التحقق من الموقع الحالي وتحديث المحافظة تلقائياً إذا كانت مختلفة عن المختارة
+  Future<void> _checkAndAutoUpdateCityFromLocation() async {
+    try {
+      // التأكد من تفعيل خدمات الموقع
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return;
+
+      // التحقق/طلب صلاحيات الموقع
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        return;
+      }
+
+      // الحصول على الإحداثيات الحالية
+      final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.low);
+
+      // تحويل الإحداثيات إلى عنوان
+      final placemarks = await placemarkFromCoordinates(position.latitude, position.longitude);
+      if (placemarks.isEmpty) return;
+
+      final detectedGovernorate = _extractGovernorateFromPlacemark(placemarks.first);
+      if (detectedGovernorate == null) return;
+      if (!_cities.contains(detectedGovernorate)) return;
+
+      final previousCity = _selectedCity;
+
+      // إذا كانت مختلفة عن المختارة حالياً
+      if (detectedGovernorate != previousCity) {
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final updated = await authProvider.updateCity(detectedGovernorate);
+        if (!mounted) return;
+        if (updated) {
+          setState(() => _selectedCity = detectedGovernorate);
+
+          // عرض حوار تأكيد التغيير أو التراجع
+          if (!mounted) return;
+          showDialog(
+            context: context,
+            builder: (ctx) {
+              return Directionality(
+                textDirection: TextDirection.rtl,
+                child: AlertDialog(
+                  title: const Text('تم تحديث المحافظة'),
+                  content: Text('تم تغيير المحافظة تلقائياً بناءً على موقعك الحالي من $previousCity إلى $detectedGovernorate'),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                      },
+                      child: const Text('موافق'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        }
+      }
+    } catch (e) {
+      // يمكن إضافة تسجيل للأخطاء إذا لزم الأمر
+    }
+  }
+
+  // استخراج المحافظة من بيانات العنوان (Placemark) باستخدام كلمات دلالية شاملة
+  String? _extractGovernorateFromPlacemark(Placemark place) {
+    // تجميع نص العنوان بالكامل وتوحيده إلى حروف صغيرة
+    String fullAddress = [
+      place.name ?? '',
+      place.street ?? '',
+      place.locality ?? '',
+      place.subLocality ?? '',
+      place.subAdministrativeArea ?? '',
+      place.administrativeArea ?? '',
+      place.country ?? '',
+    ].where((text) => text.isNotEmpty).join(' ').toLowerCase();
+
+    final Map<String, List<String>> governorateKeywords = {
+      'الإسماعيلية': ['ismailia', 'الإسماعيلية', 'اسماعيلية', 'ismailiya'],
+      'بورسعيد': ['port said', 'بورسعيد', 'بور سعيد', 'portsaid'],
+      'جنوب سيناء': ['south sinai', 'جنوب سيناء', 'شرم الشيخ', 'dahab', 'دهب'],
+      'شمال سيناء': ['north sinai', 'شمال سيناء', 'العريش', 'el arish'],
+      'البحر الأحمر': ['red sea', 'البحر الأحمر', 'hurghada', 'الغردقة', 'marsa alam'],
+      'الوادي الجديد': ['new valley', 'الوادي الجديد', 'kharga', 'الخارجة'],
+      'مطروح': ['matrouh', 'مطروح', 'marsa matrouh', 'مرسى مطروح'],
+      'أسوان': ['aswan', 'أسوان', 'اسوان'],
+      'الأقصر': ['luxor', 'الأقصر', 'اقصر'],
+      'قنا': ['qena', 'قنا'],
+      'سوهاج': ['sohag', 'سوهاج'],
+      'أسيوط': ['asyut', 'أسيوط', 'اسيوط'],
+      'المنيا': ['minya', 'المنيا', 'منيا'],
+      'بني سويف': ['beni suef', 'بني سويف'],
+      'الفيوم': ['faiyum', 'الفيوم', 'فيوم'],
+      'الجيزة': ['giza', 'الجيزة', 'جيزة', '6th october', 'اكتوبر'],
+      'القاهرة': ['cairo', 'القاهرة', 'قاهرة', 'new cairo', 'القاهرة الجديدة'],
+      'القليوبية': ['qalyubia', 'القليوبية', 'قليوبية', 'shubra', 'شبرا'],
+      'الشرقية': ['sharqia', 'الشرقية', 'شرقية', 'zagazig', 'الزقازيق'],
+      'الدقهلية': ['dakahlia', 'الدقهلية', 'دقهلية', 'mansoura', 'المنصورة'],
+      'دمياط': ['damietta', 'دمياط'],
+      'كفر الشيخ': ['kafr el-sheikh', 'كفر الشيخ'],
+      'الغربية': ['gharbia', 'الغربية', 'غربية', 'tanta', 'طنطا'],
+      'المنوفية': ['monufia', 'المنوفية', 'منوفية', 'shebin el kom'],
+      'البحيرة': ['beheira', 'البحيرة', 'بحيرة', 'damanhour', 'دمنهور'],
+      'الإسكندرية': ['alexandria', 'الإسكندرية', 'اسكندرية', 'alex'],
+      'السويس': ['suez', 'السويس'],
+    };
+
+    // البحث المباشر في النص الكامل
+    for (String governorate in governorateKeywords.keys) {
+      List<String> keywords = governorateKeywords[governorate]!;
+      for (String keyword in keywords) {
+        if (fullAddress.contains(keyword.toLowerCase())) {
+          return governorate;
+        }
+      }
+    }
+
+    // البحث الاحتياطي في الحقل الإداري
+    String adminArea = (place.administrativeArea ?? '').toLowerCase();
+    if (adminArea.isNotEmpty) {
+      for (String governorate in governorateKeywords.keys) {
+        List<String> keywords = governorateKeywords[governorate]!;
+        for (String keyword in keywords) {
+          if (adminArea.contains(keyword.toLowerCase()) || keyword.toLowerCase().contains(adminArea)) {
+            return governorate;
+          }
+        }
+      }
+    }
+
+    return null;
   }
 
   @override

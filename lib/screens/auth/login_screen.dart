@@ -54,6 +54,14 @@ class _LoginScreenState extends State<LoginScreen> {
         }
 
         final userType = user['user_type'];
+        
+        // تحقق من موافقة الإدارة قبل السماح بالدخول
+        final isApproved = user['is_approved'] == 1 || user['is_approved'] == true;
+        if (!isApproved) {
+          _showMessage('حسابك قيد المراجعة. برجاء انتظار موافقة الإدارة قبل تسجيل الدخول.', isError: true);
+          return;
+        }
+
         _showMessage('تم تسجيل الدخول بنجاح');
         
         // FCM: تسجيل Device Token بعد تسجيل الدخول الناجح

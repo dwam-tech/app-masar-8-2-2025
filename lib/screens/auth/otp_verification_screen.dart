@@ -221,6 +221,19 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen>
       _isLoading = true;
     });
 
+    // NEW: For password reset flow, do not call verifyEmailOtp.
+    // The backend expects OTP to be verified together with the new password
+    // at /api/otp/reset-password. So we navigate to the reset screen instead.
+    if (widget.purpose == 'password_reset') {
+      print('DEBUG OTP: Password reset flow - navigating to ResetProfilePassword without verifying OTP now');
+      if (!mounted) return;
+      context.goNamed('ResetProfilePassword', extra: {'email': widget.email});
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
+
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       print('DEBUG OTP: Calling authProvider.verifyEmailOtp');
