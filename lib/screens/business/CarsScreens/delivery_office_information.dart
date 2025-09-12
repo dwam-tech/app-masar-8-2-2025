@@ -308,12 +308,14 @@ Future<String?> _uploadFile(String filePath, String fieldName) async {
       if (result['status'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('تم إنشاء الحساب بنجاح'),
+            content: Text('تم إنشاء الحساب بنجاح! يرجى التحقق من بريدك الإلكتروني.'),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 3),
           ),
         );
-        context.go('/login');
+        if (mounted) {
+          context.go('/otp-verification', extra: _emailController.text);
+        }
       } else {
         final errorMessage = result['message'] ?? 'حدث خطأ أثناء التسجيل';
         ScaffoldMessenger.of(context).showSnackBar(

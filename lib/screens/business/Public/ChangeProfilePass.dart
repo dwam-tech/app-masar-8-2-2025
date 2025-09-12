@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:saba2v2/providers/auth_provider.dart';
 
 class ChangeProfilePass extends StatefulWidget {
   const ChangeProfilePass({super.key});
@@ -16,6 +18,7 @@ class _ChangeProfilePassState extends State<ChangeProfilePass> {
   bool _isObscureCurrent = true;
   bool _isObscureNew = true;
   bool _isObscureConfirm = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -25,13 +28,60 @@ class _ChangeProfilePassState extends State<ChangeProfilePass> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (_formKey.currentState!.validate()) {
-      // منطق الحفظ (يمكن ربطه بالباك ايند لاحقًا)
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم تغيير كلمة المرور بنجاح!')),
-      );
-      context.push('/restaurant-home');
+      setState(() {
+        _isLoading = true;
+      });
+
+      try {
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final result = await authProvider.changePassword(
+          currentPassword: _currentPassController.text.trim(),
+          newPassword: _newPassController.text.trim(),
+          newPasswordConfirmation: _confirmPassController.text.trim(),
+        );
+
+        if (result['status'] == true) {
+          // إظهار رسالة نجاح
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(result['message'] ?? 'تم تغيير كلمة المرور بنجاح!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+
+            // التوجه لصفحة تسجيل الدخول (تم تسجيل الخروج تلقائياً في AuthProvider)
+            context.go('/login');
+          }
+        } else {
+          // إظهار رسالة خطأ
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(result['message'] ?? 'فشل في تغيير كلمة المرور'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('حدث خطأ أثناء تغيير كلمة المرور'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
     }
   }
 
@@ -106,11 +156,20 @@ class _ChangeProfilePassState extends State<ChangeProfilePass> {
                           padding: const EdgeInsets.symmetric(vertical: 15),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        onPressed: _submit,
-                        child: const Text(
-                          'حفظ كلمة المرور',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                        ),
+                        onPressed: _isLoading ? null : _submit,
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text(
+                                'حفظ كلمة المرور',
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                              ),
                       ),
                     ),
                     const SizedBox(height: 16),

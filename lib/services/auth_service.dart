@@ -793,6 +793,31 @@ Future<Map<String, dynamic>> login({required String email, required String passw
     }
   }
 
+  /// تغيير كلمة المرور للمستخدم المسجل
+  Future<Map<String, dynamic>> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String newPasswordConfirmation,
+  }) async {
+    print('DEBUG AuthService: changePassword called');
+    try {
+      final result = await _laravelService.changePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+        newPasswordConfirmation: newPasswordConfirmation,
+      );
+      print('DEBUG AuthService: changePassword result: $result');
+      return result;
+    } catch (e) {
+      print('DEBUG AuthService: changePassword exception: $e');
+      return {
+        'status': false,
+        'message': 'تعذر تغيير كلمة المرور. حاول لاحقًا',
+        'data': null,
+      };
+    }
+  }
+
   Future<Map<String, dynamic>> resetPasswordWithOtp({
     required String email,
     required String otp,

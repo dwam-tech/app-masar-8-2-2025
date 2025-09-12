@@ -100,6 +100,10 @@ class _ResturantInformationState extends State<ResturantInformation> {
   bool _hasTableReservation = false;
   bool _wantsDeposit = false;
 
+  // Password visibility toggles
+  bool _isPasswordVisible = false;
+  bool _isConfirmPasswordVisible = false;
+
   final List<String> _cuisineTypes = const ['غربي', 'ايطالي', 'شرقي', 'صيني', 'هندي'];
   List<bool> _selectedCuisineTypes = [false, false, false, false, false];
   
@@ -543,10 +547,17 @@ class _ResturantInformationState extends State<ResturantInformation> {
           TextFormField(
             key: const ValueKey('password'),
             controller: _passwordController,
-            obscureText: true,
+            obscureText: !_isPasswordVisible,
             decoration: InputDecoration(
               labelText: 'كلمة المرور',
               prefixIcon: const Icon(Icons.lock),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                  color: Colors.grey[600],
+                ),
+                onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
+              ),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             ),
@@ -556,10 +567,17 @@ class _ResturantInformationState extends State<ResturantInformation> {
           TextFormField(
             key: const ValueKey('confirmPassword'),
             controller: _confirmPasswordController,
-            obscureText: true,
+            obscureText: !_isConfirmPasswordVisible,
             decoration: InputDecoration(
               labelText: 'تأكيد كلمة المرور',
               prefixIcon: const Icon(Icons.lock_outline),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _isConfirmPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                  color: Colors.grey[600],
+                ),
+                onPressed: () => setState(() => _isConfirmPasswordVisible = !_isConfirmPasswordVisible),
+              ),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             ),

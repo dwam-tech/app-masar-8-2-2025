@@ -325,12 +325,12 @@ class _DeliveryPersonInformationScreenState extends State<DeliveryPersonInformat
         ScaffoldMessenger.of(context).clearSnackBars();
         
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Row(
               children: [
                 Icon(Icons.check_circle, color: Colors.white),
                 SizedBox(width: 16),
-                Text('تم تسجيل السائق بنجاح'),
+                Text('تم تسجيل السائق بنجاح! يرجى التحقق من بريدك الإلكتروني.'),
               ],
             ),
             backgroundColor: Colors.green,
@@ -341,7 +341,7 @@ class _DeliveryPersonInformationScreenState extends State<DeliveryPersonInformat
         // تأخير قصير قبل الانتقال للصفحة التالية
         Future.delayed(const Duration(milliseconds: 1500), () {
           if (mounted) {
-            context.go('/login');
+            context.go('/otp-verification', extra: _emailController.text);
           }
         });
       } else {
@@ -574,7 +574,7 @@ class _DeliveryPersonInformationScreenState extends State<DeliveryPersonInformat
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           suffixIcon: isPassword ? IconButton(
             icon: Icon(
-              obscureText ? Icons.visibility : Icons.visibility_off,
+              obscureText ? Icons.visibility_off : Icons.visibility,
               color: Colors.grey[600],
             ),
             onPressed: onToggleVisibility,

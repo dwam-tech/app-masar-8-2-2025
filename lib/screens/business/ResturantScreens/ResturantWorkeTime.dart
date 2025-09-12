@@ -179,9 +179,11 @@ class _ResturantWorkTimeState extends State<ResturantWorkTime> {
       if (!mounted) return;
       if (result['status'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم تسجيل المطعم بنجاح!'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('تم تسجيل المطعم بنجاح! يرجى التحقق من بريدك الإلكتروني.'), backgroundColor: Colors.green),
         );
-        context.go('/login'); // تم تغيير التوجيه إلى صفحة تسجيل الدخول بدلاً من تسجيل الدخول التلقائي
+        if (mounted) {
+          context.go('/otp-verification', extra: widget.accountInfo.email);
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(result['message'] ?? 'فشل التسجيل')),

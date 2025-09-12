@@ -321,12 +321,12 @@ class _SubscriptionRegistrationSingleScreenState
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('تم إنشاء الحساب بنجاح'),
+              content: Text('تم إنشاء الحساب بنجاح! يرجى التحقق من بريدك الإلكتروني.'),
               backgroundColor: Colors.green,
               duration: Duration(seconds: 3),
             ),
           );
-          context.go('/login');
+          context.go('/otp-verification', extra: _emailController.text);
         }
       } else {
         if (context.mounted) {
@@ -422,7 +422,7 @@ class _SubscriptionRegistrationSingleScreenState
         suffixIcon: isPassword
             ? IconButton(
                 icon: Icon(
-                  obscureText ? Icons.visibility : Icons.visibility_off,
+                  obscureText ? Icons.visibility_off : Icons.visibility,
                   color: Colors.grey[600],
                 ),
                 onPressed: onToggleVisibility,
@@ -481,9 +481,21 @@ class _SubscriptionRegistrationSingleScreenState
                     ),
                   ),
                   const SizedBox(height: 16),
-                  _buildFormField(hintText: 'كلمة السر', controller: _passwordController, obscureText: true),
+                  _buildFormField(
+                    hintText: 'كلمة السر', 
+                    controller: _passwordController, 
+                    obscureText: !_isPasswordVisible,
+                    isPassword: true,
+                    onToggleVisibility: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
+                  ),
                   const SizedBox(height: 16),
-                  _buildFormField(hintText: 'تأكيد كلمة السر', controller: _confirmPasswordController, obscureText: true),
+                  _buildFormField(
+                    hintText: 'تأكيد كلمة السر', 
+                    controller: _confirmPasswordController, 
+                    obscureText: !_isConfirmPasswordVisible,
+                    isPassword: true,
+                    onToggleVisibility: () => setState(() => _isConfirmPasswordVisible = !_isConfirmPasswordVisible),
+                  ),
                   
                   const SizedBox(height: 24),
                   const SectionTitle(title: 'صورة الملف الشخصي'),

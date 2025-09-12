@@ -488,12 +488,14 @@ class _SubscriptionRegistrationOfficeScreenState
       if (result['status'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('تم تسجيل المكتب بنجاح'),
+            content: Text('تم تسجيل المكتب بنجاح! يرجى التحقق من بريدك الإلكتروني.'),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 3),
           ),
         );
-        context.go('/login');
+        if (mounted) {
+          context.go('/otp-verification', extra: _emailController.text);
+        }
       } else {
         final errorMessage = result['message'] ?? 'فشل التسجيل';
         ScaffoldMessenger.of(context).showSnackBar(
@@ -636,7 +638,7 @@ class _SubscriptionRegistrationOfficeScreenState
         ),
         suffixIcon: isPassword ? IconButton(
           icon: Icon(
-            obscureText ? Icons.visibility : Icons.visibility_off,
+            obscureText ? Icons.visibility_off : Icons.visibility,
             color: Colors.grey[600],
           ),
           onPressed: onToggleVisibility,

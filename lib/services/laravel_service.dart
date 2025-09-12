@@ -336,6 +336,85 @@ class LaravelService {
     }
   }
 
+  // إضافة: تغيير كلمة المرور للمستخدم المسجل
+  Future<Map<String, dynamic>> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String newPasswordConfirmation,
+  }) async {
+    print('DEBUG LaravelService: changePassword called');
+    print('DEBUG LaravelService: API URL: $baseUrl/api/change-password');
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      
+      if (token == null) {
+        return {
+          'status': false,
+          'message': 'يجب تسجيل الدخول أولاً',
+          'data': null,
+        };
+      }
+
+      final requestBody = {
+        'current_password': currentPassword,
+        'new_password': newPassword,
+        'new_password_confirmation': newPasswordConfirmation,
+      };
+      print('DEBUG LaravelService: Request body: $requestBody');
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/change-password'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      print('DEBUG LaravelService: changePassword status: ${response.statusCode}');
+      print('DEBUG LaravelService: changePassword body: ${response.body}');
+
+      final responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'status': responseData['success'] ?? true,
+          'message': responseData['message'] ?? 'تم تغيير كلمة المرور بنجاح',
+          'data': responseData,
+        };
+      } else if (response.statusCode == 422) {
+        return {
+          'status': false,
+          'message': responseData['message'] ?? 'البيانات المدخلة غير صحيحة',
+          'errors': responseData['errors'],
+          'data': responseData,
+        };
+      } else if (response.statusCode == 401) {
+        return {
+          'status': false,
+          'message': 'كلمة المرور الحالية غير صحيحة',
+          'data': responseData,
+        };
+      } else {
+        return {
+          'status': false,
+          'message': responseData['message'] ?? 'فشل في تغيير كلمة المرور',
+          'data': responseData,
+        };
+      }
+    } catch (e) {
+      debugPrint('changePassword Error: $e');
+      return {
+        'status': false,
+        'message': 'خطأ في الشبكة أثناء تغيير كلمة المرور',
+        'data': null,
+      };
+    }
+  }
+
   // إضافة: إعادة تعيين كلمة المرور باستخدام رمز OTP
   Future<Map<String, dynamic>> resetPasswordWithOtp({
     required String email,

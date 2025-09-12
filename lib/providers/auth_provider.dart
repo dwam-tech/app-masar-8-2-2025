@@ -560,6 +560,37 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  /// تغيير كلمة المرور للمستخدم المسجل
+  Future<Map<String, dynamic>> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String newPasswordConfirmation,
+  }) async {
+    print('DEBUG AuthProvider: changePassword called');
+    try {
+      final result = await _authService.changePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+        newPasswordConfirmation: newPasswordConfirmation,
+      );
+      print('DEBUG AuthProvider: changePassword result: $result');
+      
+      // إذا تم تغيير كلمة المرور بنجاح، قم بتسجيل خروج المستخدم
+      if (result['status'] == true) {
+        await logout();
+      }
+      
+      return result;
+    } catch (e) {
+      print('DEBUG AuthProvider: changePassword Exception: $e');
+      debugPrint('AuthProvider changePassword Error: $e');
+      return {
+        'status': false,
+        'message': 'حدث خطأ أثناء تغيير كلمة المرور',
+      };
+    }
+  }
+
   Future<Map<String, dynamic>> registerRealstateOffice(
       {required String username,
       required String email,
