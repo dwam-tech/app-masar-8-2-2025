@@ -262,14 +262,8 @@ class _CartScreenState extends State<CartScreen> {
             );
           },
         ),
-        bottomNavigationBar: MyBottomNavBar(
+        bottomNavigationBar: const MyBottomNavBar(
           currentIndex: 2, // Cart index
-          routes: [
-            '/UserHomeScreen',    // الرئيسية - index 0
-            '/my-orders',         // طلباتي - index 1
-            '/cart',              // السلة - index 2
-            '/SettingsUser',      // الإعدادات - index 3
-          ],
         ),
       ),
     );

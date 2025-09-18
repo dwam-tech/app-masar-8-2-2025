@@ -88,6 +88,7 @@ import 'package:saba2v2/screens/user/car_service_selection_screen.dart';
 import 'package:saba2v2/screens/user/delivery_request_screen.dart';
 import 'package:saba2v2/screens/user/car_rental_request_screen.dart';
 import 'package:saba2v2/screens/user/my_orders_screen.dart';
+import 'package:saba2v2/screens/user/favorites_screen.dart';
 // إضافة NavigationService لاستخدام navigatorKey الخاص به مع GoRouter
 import 'package:saba2v2/screens/user/widgets/order_filter_widgets.dart';
 
@@ -414,6 +415,11 @@ class AppRouter {
           path: '/my-orders',
           name: 'myOrders',
           builder: (context, state) => const MyOrdersScreen(),
+        ),
+        GoRoute(
+          path: '/favorites',
+          name: 'favorites',
+          builder: (context, state) => const FavoritesScreen(),
         ),
         GoRoute(
           path: '/featured-properties',

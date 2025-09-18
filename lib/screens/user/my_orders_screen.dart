@@ -439,7 +439,6 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> with TickerProviderStat
       ),
       bottomNavigationBar: const MyBottomNavBar(
         currentIndex: 1,
-        routes: ['/UserHomeScreen', '/my-orders', '/cart', '/SettingsUser'],
       ),
     );
   }

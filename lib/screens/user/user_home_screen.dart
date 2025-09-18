@@ -25,6 +25,7 @@ import 'package:saba2v2/screens/all_restaurants_screen.dart';
 import 'package:saba2v2/screens/user/all_properties_screen.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import '../../widgets/my_bottom_nav_bar.dart';
 
 class UserHomeScreen extends StatefulWidget {
   const UserHomeScreen({super.key});
@@ -70,6 +71,29 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
     'سوهاج',
   ];
 
+  // إضافة دعم الأحياء
+  String _selectedNeighborhood = 'الكل';
+  static const Map<String, List<String>> _neighborhoodsMap = {
+    'القاهرة': [
+      'الكل', 'التجمع الخامس', 'مدينتي', 'الشروق', 'مدينة نصر', 'مصر الجديدة', 'المعادي', 'حلوان', 'الزيتون', 'عين شمس', 'السيدة زينب', 'العتبة', 'وسط البلد', 'روض الفرج', 'الشرابية', 'شبرا'
+    ],
+    'الجيزة': [
+      'الكل', '6 أكتوبر', 'الشيخ زايد', 'الهرم', 'فيصل', 'الدقي', 'العجوزة', 'بولاق الدكرور', 'إمبابة', 'المنصورية'
+    ],
+    'الإسكندرية': [
+      'الكل', 'سيدي جابر', 'رشدي', 'سموحة', 'كامب شيزار', 'جليم', 'المندرة', 'ميامي', 'العجمي'
+    ],
+    'الدقهلية': ['الكل', 'المنصورة', 'طلخا', 'ميت غمر', 'السنبلاوين'],
+    'الغربية': ['الكل', 'طنطا', 'المحلة الكبرى'],
+    'المنوفية': ['الكل', 'شبين الكوم', 'منوف', 'السادات'],
+    'الشرقية': ['الكل', 'الزقازيق', 'العاشر من رمضان', 'بلبيس'],
+    'بورسعيد': ['الكل', 'حي الشرق', 'حي العرب', 'حي الضواحي'],
+    'الإسماعيلية': ['الكل', 'حي أول', 'حي ثان', 'حي ثالث'],
+    'السويس': ['الكل', 'حي السويس', 'حي الأربعين'],
+    'الأقصر': ['الكل', 'الكارناك', 'الأقصر'],
+    'أسوان': ['الكل', 'أسوان الجديدة', 'السد العالي'],
+  };
+  List<String> get _currentNeighborhoods => _neighborhoodsMap[_selectedCity] ?? const ['الكل'];
   // Responsive breakpoints
   static const double _tabletBreakpoint = 768.0;
   Timer? _autoSlideTimer;
@@ -95,6 +119,18 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
           _selectedCity = savedCity;
         });
       }
+
+      // استرجاع/تعيين الحي بحسب المحافظة الحالية
+      final prefs = await SharedPreferences.getInstance();
+      final neighborhoods = _currentNeighborhoods;
+      final savedNeighborhood = prefs.getString('selected_neighborhood');
+      setState(() {
+        if (savedNeighborhood != null && neighborhoods.contains(savedNeighborhood)) {
+          _selectedNeighborhood = savedNeighborhood;
+        } else {
+          _selectedNeighborhood = neighborhoods.first;
+        }
+      });
 
       // بعد تحديد المحافظة، تحقق من الموقع الحالي وقارن
       if (!_locationChecked) {
@@ -165,7 +201,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
         );
       }
     } catch (e) {
-      Navigator.of(context).pop(); // إغلاق مؤشر التحميل
+      Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('حدث خطأ أثناء تحديث المحافظة'),
@@ -198,35 +234,46 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
       final placemarks = await placemarkFromCoordinates(position.latitude, position.longitude);
       if (placemarks.isEmpty) return;
 
-      final detectedGovernorate = _extractGovernorateFromPlacemark(placemarks.first);
+      final place = placemarks.first;
+      final detectedGovernorate = _extractGovernorateFromPlacemark(place);
       if (detectedGovernorate == null) return;
       if (!_cities.contains(detectedGovernorate)) return;
 
-      final previousCity = _selectedCity;
+      final detectedNeighborhood = _extractNeighborhoodFromPlacemark(place, detectedGovernorate);
 
-      // إذا كانت مختلفة عن المختارة حالياً
-      if (detectedGovernorate != previousCity) {
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
-        final updated = await authProvider.updateCity(detectedGovernorate);
+      final previousGovernorate = _selectedCity;
+      final previousNeighborhood = _selectedNeighborhood;
+
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+      if (detectedGovernorate != previousGovernorate) {
+        // تغيرت المحافظة: حدّث المحافظة والحي معاً
+        final success = await authProvider.updateLocation(
+          governorate: detectedGovernorate,
+          city: detectedNeighborhood ?? (_neighborhoodsMap[detectedGovernorate]?.first ?? 'الكل'),
+        );
         if (!mounted) return;
-        if (updated) {
-          setState(() => _selectedCity = detectedGovernorate);
+        if (success) {
+          final newNeighborhood = detectedNeighborhood ?? (_neighborhoodsMap[detectedGovernorate]?.first ?? 'الكل');
+          setState(() {
+            _selectedCity = detectedGovernorate;
+            _selectedNeighborhood = newNeighborhood;
+          });
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('selected_city', detectedGovernorate);
+          await prefs.setString('selected_neighborhood', newNeighborhood);
 
-          // عرض حوار تأكيد التغيير أو التراجع
-          if (!mounted) return;
           showDialog(
             context: context,
             builder: (ctx) {
               return Directionality(
                 textDirection: TextDirection.rtl,
                 child: AlertDialog(
-                  title: const Text('تم تحديث المحافظة'),
-                  content: Text('تم تغيير المحافظة تلقائياً بناءً على موقعك الحالي من $previousCity إلى $detectedGovernorate'),
+                  title: const Text('تم تحديث موقعك'),
+                  content: Text('تم تغيير المحافظة تلقائياً بناءً على موقعك الحالي من $previousGovernorate إلى $detectedGovernorate'),
                   actions: [
                     TextButton(
-                      onPressed: () {
-                        Navigator.of(ctx).pop();
-                      },
+                      onPressed: () => Navigator.of(ctx).pop(),
                       child: const Text('موافق'),
                     ),
                   ],
@@ -234,6 +281,20 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
               );
             },
           );
+        }
+      } else {
+        // نفس المحافظة: قد نقوم بتحديث الحي فقط إذا تغيّر
+        if (detectedNeighborhood != null && detectedNeighborhood != previousNeighborhood && _currentNeighborhoods.contains(detectedNeighborhood)) {
+          final success = await authProvider.updateNeighborhood(detectedNeighborhood);
+          if (!mounted) return;
+          if (success) {
+            setState(() => _selectedNeighborhood = detectedNeighborhood);
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('selected_neighborhood', detectedNeighborhood);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('تم تعيين الحي تلقائياً: $detectedNeighborhood')),
+            );
+          }
         }
       }
     } catch (e) {
@@ -310,6 +371,60 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
     return null;
   }
 
+  String? _extractNeighborhoodFromPlacemark(Placemark place, String governorate) {
+    final candidates = <String>{};
+    void add(String? s) { if (s != null && s.trim().isNotEmpty) candidates.add(s.trim()); }
+    add(place.subLocality);
+    add(place.locality);
+    add(place.name);
+    add(place.street);
+
+    final normalized = candidates.map(_normalize).toList();
+    final neighborhoods = _neighborhoodsMap[governorate] ?? const <String>[];
+    for (final n in neighborhoods) {
+      if (n == 'الكل') continue;
+      final nn = _normalize(n);
+      for (final c in normalized) {
+        if (c.contains(nn) || nn.contains(c)) return n;
+      }
+    }
+    return null;
+  }
+
+  String _normalize(String s) => s.toLowerCase().replaceAll(RegExp(r'\s+'), ' ').trim();
+
+  Future<void> _changeNeighborhood(String? newNeighborhood) async {
+    if (newNeighborhood == null || newNeighborhood == _selectedNeighborhood) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator(color: Color(0xFFFC8700))),
+    );
+
+    try {
+      final ok = await context.read<AuthProvider>().updateNeighborhood(newNeighborhood);
+      Navigator.of(context).pop();
+      if (ok) {
+        setState(() => _selectedNeighborhood = newNeighborhood);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('selected_neighborhood', newNeighborhood);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تم تحديث الحي إلى $newNeighborhood'), backgroundColor: Colors.green),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('فشل في تحديث الحي'), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('حدث خطأ أثناء تحديث الحي'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -321,7 +436,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
           child: Scaffold(
             backgroundColor: const Color(0xFFF8F9FA),
             appBar: PreferredSize(
-              preferredSize: Size.fromHeight(isTablet ? 88.0 : 76.0),
+              preferredSize: Size.fromHeight(isTablet ? 88.0 : 118.0),
               child: _buildAppBar(context, isTablet),
             ),
             body: SingleChildScrollView(
@@ -331,35 +446,33 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // شريط البحث
-                    GestureDetector(
-                      onTap: () {
-                        context.push('/search');
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(15),
-                          border: Border.all(color: const Color(0xFFDEDCD9)),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.search, color: Color(0xFF5D554A)),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'ما الذي تبحث عنه؟',
-                              style: TextStyle(
-                                color: Color(0xFFBBB6B0),
-                                fontWeight: FontWeight.w500,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16.0),
+                    // GestureDetector(
+                    //   onTap: () {
+                    //     context.push('/search');
+                    //   },
+                    //   child: Container(
+                    //     decoration: BoxDecoration(
+                    //       color: Colors.white,
+                    //       borderRadius: BorderRadius.circular(15),
+                    //       border: Border.all(color: const Color(0xFFDEDCD9)),
+                    //     ),
+                    //     padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    //     child: Row(
+                    //       children: [
+                    //         const Icon(Icons.search, color: Color(0xFF5D554A)),
+                    //         const SizedBox(width: 8),
+                    //         const Text(
+                    //           'ما الذي تبحث عنه؟',
+                    //           style: TextStyle(
+                    //             color: Color(0xFFBBB6B0),
+                    //             fontWeight: FontWeight.w500,
+                    //             fontSize: 16,
+                    //           ),
+                    //         ),
+                    //       ],
+                    //     ),
+                    //   ),
+                    // ),
 
                     // --- Slider & Dashes ---
                     Consumer<BannerProvider>(
@@ -615,18 +728,9 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                 ),
               ),
             ),
-            bottomNavigationBar: MyBottomNavBar(
+            bottomNavigationBar: const MyBottomNavBar(
               currentIndex: 0,
-              onTap: (index) {
-                // السلوك الافتراضي إذا لم يكن هناك مسار
-              },
-              routes: [
-                '/UserHomeScreen',      // مسار الصفحة الرئيسية
-                '/my-orders',           // مسار طلباتي
-                '/cart',                // مسار السلة
-                '/SettingsUser',        // مسار الإعدادات
-              ],
-            )
+            ),
           ),
         );
       },
@@ -671,83 +775,127 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
           top: isTablet ? 20.0 : 40.0,
           bottom: 15,
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Column(
           children: [
             Row(
+               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
+                Row(
+                  children: [
+                    Icon(Icons.menu,size: isTablet ? 26 : 24, color: Colors.orange[900],),
+                    SizedBox(width: 10,),
+                    Text(
+                      "الرئيسية",
+                      style: TextStyle(
+                        fontSize: isTablet ? 19 : 17,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange[900],
+                      ),
+                    ),
+                  ],
+                ),
+                 _buildActionButtons(context, isTablet),
+              ],
+            ),
+            Row(
+               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+               crossAxisAlignment: CrossAxisAlignment.center,
+               mainAxisSize: MainAxisSize.max,
+               verticalDirection: VerticalDirection.down,
+              children: [  
+                // قائمة الأحياء
+              Container(
                   padding: const EdgeInsets.only(top: 11, bottom: 11, right: 12, left: 12),
                   decoration: BoxDecoration(
-                      color: const Color(0xFFF5F5F5),
-                      borderRadius: BorderRadius.circular(20)),
-                  child: Directionality(
-                    textDirection: TextDirection.rtl,
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton2<String>(
-                        isExpanded: true,
-                        value: _selectedCity,
-                        customButton: Row(
-                          children: [
-                            SvgPicture.asset(
-                              "assets/icons/UserCityIcon.svg",
-                              height: isTablet ? 26 : 20,
-                              width: isTablet ? 26 : 20,
-                              color: const Color(0xFFFC8700),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _selectedCity,
-                              style: TextStyle(
-                                fontSize: isTablet ? 19 : 15,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.orange[900],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              color: Colors.orange[700],
+                    color: const Color(0xFFF5F5F5),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton2<String>(
+                      isExpanded: true,
+                      value: _currentNeighborhoods.contains(_selectedNeighborhood)
+                          ? _selectedNeighborhood
+                          : _currentNeighborhoods.first,
+                      customButton: Row(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        textDirection: TextDirection.rtl,
+                         children: [
+                           const Icon(Icons.location_on, color: Color(0xFFFC8700)),
+                           const SizedBox(width: 6),
+                           Column(
+                             crossAxisAlignment: CrossAxisAlignment.start,
+                             children: [
+                               Text(
+                                 "موقعك الحالي",
+                                 style: TextStyle(
+                                   fontSize: isTablet ? 12 : 10,
+                                   fontWeight: FontWeight.w600,
+                                   color: const Color(0xFF2C2C2C),
+                                 ),
+                                 textAlign: TextAlign.right,
+                                 textDirection: TextDirection.rtl,
+                               ),
+                               Text(
+                                 _currentNeighborhoods.contains(_selectedNeighborhood)
+                                     ? _selectedNeighborhood
+                                     : _currentNeighborhoods.first,
+                                 style: TextStyle(
+                                   fontSize: isTablet ? 12 : 10,
+                                   fontWeight: FontWeight.w600,
+                                   color: const Color(0xFF2C2C2C),
+                                   
+                                 ),
+                                 textAlign: TextAlign.right,
+                                 textDirection: TextDirection.rtl,
+                               ),
+                         
+                             ],
+                           ),
+                           Icon(Icons.keyboard_arrow_down_rounded, color: Colors.orange[700]),
+                           const SizedBox(width: 6),
+                         ],
+                       ),
+                      dropdownStyleData: DropdownStyleData(
+                        width: 160,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          color: Colors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.orange.withOpacity(0.08),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
                             ),
                           ],
                         ),
-                        dropdownStyleData: DropdownStyleData(
-                          width: 120,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(14),
-                            color: Colors.white,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.orange.withOpacity(0.08),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          maxHeight: 250,
-                          elevation: 2,
-                        ),
-                        menuItemStyleData: const MenuItemStyleData(
-                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        ),
-                        items: _cities
-                            .map((c) => DropdownMenuItem(
-                          value: c,
-                          child: Text(
-                            c,
-                            style: TextStyle(fontSize: isTablet ? 18 : 14),
-                            textAlign: TextAlign.right,
-                          ),
-                        ))
-                            .toList(),
-                        onChanged: _changeCity,
+                        maxHeight: 280,
+                        elevation: 2,
                       ),
+                      menuItemStyleData: const MenuItemStyleData(
+                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      ),
+                      items: _currentNeighborhoods
+                          .map((n) => DropdownMenuItem(
+                                value: n,
+                                alignment: Alignment.centerRight,
+                                child: Container(
+                                  width: double.infinity,
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    n,
+                                    textAlign: TextAlign.right,
+                                    textDirection: TextDirection.rtl,
+                                  ),
+                                ),
+                              ))
+                          .toList(),
+                      onChanged: _changeNeighborhood,
                     ),
                   ),
-                )
+                ),
+              IconButton(onPressed: (){context.push('/search');}, icon: Icon(Icons.search))
               ],
             ),
-            _buildActionButtons(context, isTablet),
           ],
         ),
       ),
@@ -1088,152 +1236,6 @@ class _RestaurantRowCardsState extends State<RestaurantRowCards> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-
-
-class MyBottomNavBar extends StatelessWidget {
-  final int currentIndex;
-  final Function(int) onTap;
-  final List<String?> routes;
-
-  const MyBottomNavBar({
-    super.key,
-    required this.currentIndex,
-    required this.onTap,
-    this.routes = const [],
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isTablet = MediaQuery.of(context).size.width >= 768;
-    final orangeColor = const Color(0xFFFC8700);
-
-    final List<Map<String, dynamic>> navItems = [
-      {
-        'icon': 'assets/icons/home_icon_provider.svg',
-        'label': 'الرئيسية',
-        'route': routes.isNotEmpty && routes.length > 0 ? routes[0] : null,
-      },
-      {
-        'icon': 'assets/icons/Nav_Menu_provider.svg',
-        'label': 'طلباتي',
-        'route': routes.isNotEmpty && routes.length > 1 ? routes[1] : null,
-      },
-      {
-        'icon': 'assets/icons/cart.svg',
-        'label': 'السلة',
-        'route': routes.isNotEmpty && routes.length > 2 ? routes[2] : null,
-      },
-      {
-        'icon': 'assets/icons/menu.svg',
-        'label': 'الإعدادات',
-        'route': routes.isNotEmpty && routes.length > 3 ? routes[3] : null,
-      },
-    ];
-
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 12,
-              offset: const Offset(0, -4),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              vertical: isTablet ? 16 : 10,
-              horizontal: isTablet ? 20 : 8,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: navItems.asMap().entries.map((entry) {
-                final index = entry.key;
-                final item = entry.value;
-                final selected = index == 0; // Statically set Home (index 0) as active
-                final mainColor = selected ? orangeColor : const Color(0xFF6B7280);
-
-                return InkWell(
-                  onTap: () {
-                    if (item['route'] != null) {
-                      context.go(item['route']);
-                    } else {
-                      onTap(index);
-                    }
-                  },
-                  borderRadius: BorderRadius.circular(16),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isTablet ? 20 : 16,
-                      vertical: isTablet ? 12 : 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: selected ? orangeColor.withOpacity(0.1) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            SvgPicture.asset(
-                              item['icon'],
-                              height: isTablet ? 28 : 24,
-                              width: isTablet ? 28 : 24,
-                              colorFilter: ColorFilter.mode(mainColor, BlendMode.srcIn),
-                            ),
-                            // إضافة مؤشر السلة للتبويب الثاني (السلة)
-                            if (index == 1)
-                              Consumer<CartProvider>(
-                                builder: (context, cartProvider, child) {
-                                  final totalItems = cartProvider.totalItems;
-                                  if (totalItems > 0) {
-                                    return Positioned(
-                                      right: -6,
-                                      top: -6,
-                                      child: Container(
-                                        width: 12,
-                                        height: 12,
-                                        decoration: BoxDecoration(
-                                          color: Colors.green,
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                  return SizedBox.shrink();
-                                },
-                              ),
-                          ],
-                        ),
-                        SizedBox(height: isTablet ? 8 : 6),
-                        Text(
-                          item['label'],
-                          style: TextStyle(
-                            fontSize: isTablet ? 14 : 12,
-                            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                            color: mainColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
         ),
       ),
     );

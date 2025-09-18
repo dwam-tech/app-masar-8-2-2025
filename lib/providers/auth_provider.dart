@@ -972,6 +972,48 @@ class AuthProvider with ChangeNotifier {
   String? get userCity {
     return _userData?['governorate'];
   }
+
+  /// دالة لتحديث حي المستخدم (city)
+  Future<bool> updateNeighborhood(String newNeighborhood) async {
+    try {
+      final success = await _authService.updateNeighborhood(newNeighborhood);
+      if (success) {
+        if (_userData != null) {
+          _userData!['city'] = newNeighborhood;
+          notifyListeners();
+        }
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('خطأ في AuthProvider.updateNeighborhood: $e');
+      return false;
+    }
+  }
+
+  /// دالة لتحديث موقع المستخدم (المحافظة + الحي) دفعة واحدة
+  Future<bool> updateLocation({required String governorate, required String city}) async {
+    try {
+      final success = await _authService.updateLocation(governorate: governorate, city: city);
+      if (success) {
+        if (_userData != null) {
+          _userData!['governorate'] = governorate;
+          _userData!['city'] = city;
+          notifyListeners();
+        }
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('خطأ في AuthProvider.updateLocation: $e');
+      return false;
+    }
+  }
+
+  /// Getter لحي المستخدم الحالي
+  String? get userNeighborhood {
+    return _userData?['city'];
+  }
 }
 
 

@@ -7,13 +7,11 @@ import '../providers/cart_provider.dart';
 class MyBottomNavBar extends StatelessWidget {
   final int currentIndex;
   final Function(int)? onTap;
-  final List<String?> routes;
 
   const MyBottomNavBar({
     super.key,
     required this.currentIndex,
     this.onTap,
-    this.routes = const [],
   });
 
   @override
@@ -25,22 +23,27 @@ class MyBottomNavBar extends StatelessWidget {
       {
         'icon': 'assets/icons/home_icon_provider.svg',
         'label': 'الرئيسية',
-        'route': routes.isNotEmpty && routes.length > 0 ? routes[0] : '/user-home',
+        'route': '/UserHomeScreen',
       },
       {
         'icon': 'assets/icons/Nav_Menu_provider.svg',
         'label': 'طلباتي',
-        'route': routes.isNotEmpty && routes.length > 1 ? routes[1] : '/my-orders',
+        'route': '/my-orders',
       },
       {
         'icon': 'assets/icons/cart.svg',
         'label': 'السلة',
-        'route': routes.isNotEmpty && routes.length > 2 ? routes[2] : '/cart',
+        'route': '/cart',
+      },
+      {
+        'icon': 'assets/icons/favorite_outline.svg',
+        'label': 'المفضلة',
+        'route': '/favorites',
       },
       {
         'icon': 'assets/icons/menu.svg',
         'label': 'الإعدادات',
-        'route': routes.isNotEmpty && routes.length > 3 ? routes[3] : '/settings',
+        'route': '/SettingsUser',
       },
     ];
 
@@ -83,8 +86,8 @@ class MyBottomNavBar extends StatelessWidget {
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     padding: EdgeInsets.symmetric(
-                      horizontal: isTablet ? 20 : 16,
-                      vertical: isTablet ? 12 : 10,
+                      horizontal: isTablet ? 20 : 10,
+                      vertical: isTablet ? 12 : 4,
                     ),
                     decoration: BoxDecoration(
                       color: selected ? orangeColor.withOpacity(0.1) : Colors.transparent,
@@ -96,12 +99,19 @@ class MyBottomNavBar extends StatelessWidget {
                         Stack(
                           clipBehavior: Clip.none,
                           children: [
-                            SvgPicture.asset(
-                              item['icon'],
-                              height: isTablet ? 28 : 24,
-                              width: isTablet ? 28 : 24,
-                              colorFilter: ColorFilter.mode(mainColor, BlendMode.srcIn),
-                            ),
+                            // استخدام أيقونة افتراضية إذا لم تكن متوفرة
+                            item['icon'].endsWith('favorite_outline.svg')
+                                ? Icon(
+                                    Icons.favorite_outline,
+                                    size: isTablet ? 28 : 24,
+                                    color: mainColor,
+                                  )
+                                : SvgPicture.asset(
+                                    item['icon'],
+                                    height: isTablet ? 28 : 24,
+                                    width: isTablet ? 28 : 24,
+                                    colorFilter: ColorFilter.mode(mainColor, BlendMode.srcIn),
+                                  ),
                             // إضافة مؤشر السلة للتبويب الثالث (السلة)
                             if (index == 2)
                               Consumer<CartProvider>(
@@ -112,21 +122,23 @@ class MyBottomNavBar extends StatelessWidget {
                                       right: -6,
                                       top: -6,
                                       child: Container(
-                                        width: 18,
-                                        height: 18,
-                                        decoration: BoxDecoration(
+                                        padding: const EdgeInsets.all(2),
+                                        decoration: const BoxDecoration(
                                           color: Colors.red,
                                           shape: BoxShape.circle,
                                         ),
-                                        child: Center(
-                                          child: Text(
-                                            totalItems > 9 ? '9+' : totalItems.toString(),
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                            ),
+                                        constraints: const BoxConstraints(
+                                          minWidth: 16,
+                                          minHeight: 16,
+                                        ),
+                                        child: Text(
+                                          totalItems > 99 ? '99+' : totalItems.toString(),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
                                           ),
+                                          textAlign: TextAlign.center,
                                         ),
                                       ),
                                     );

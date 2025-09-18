@@ -732,6 +732,85 @@ Future<Map<String, dynamic>> login({required String email, required String passw
     }
   }
 
+  // دالة جديدة: تحديث الحي (city) فقط
+  Future<bool> updateNeighborhood(String newNeighborhood) async {
+    try {
+      final token = await getToken();
+      if (token == null) throw Exception('المستخدم غير مسجل الدخول');
+      final userData = await getUserData();
+      if (userData == null || userData['id'] == null) {
+        throw Exception('لا يمكن العثور على معرف المستخدم');
+      }
+      final userId = userData['id'];
+      final response = await http.put(
+        Uri.parse('$baseUrl/api/users/$userId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'city': newNeighborhood}),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        if (responseData['status'] == true || responseData['user'] != null) {
+          userData['city'] = newNeighborhood;
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('user_data', jsonEncode(userData));
+          return true;
+        }
+      }
+      return false;
+    } catch (e) {
+      debugPrint('خطأ في تحديث الحي: $e');
+      return false;
+    }
+  }
+
+  // دالة جديدة: تحديث الموقع بالكامل (المحافظة + الحي)
+  Future<bool> updateLocation({required String governorate, String? city}) async {
+    try {
+      final token = await getToken();
+      if (token == null) throw Exception('المستخدم غير مسجل الدخول');
+      final userData = await getUserData();
+      if (userData == null || userData['id'] == null) {
+        throw Exception('لا يمكن العثور على معرف المستخدم');
+      }
+      final userId = userData['id'];
+
+      final Map<String, dynamic> payload = {'governorate': governorate};
+      if (city != null && city.isNotEmpty) payload['city'] = city;
+
+      final response = await http.put(
+        Uri.parse('$baseUrl/api/users/$userId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(payload),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        if (responseData['status'] == true || responseData['user'] != null) {
+          userData['governorate'] = governorate;
+          if (city != null && city.isNotEmpty) {
+            userData['city'] = city;
+          }
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('user_data', jsonEncode(userData));
+          return true;
+        }
+      }
+      return false;
+    } catch (e) {
+      debugPrint('خطأ في تحديث الموقع: $e');
+      return false;
+    }
+  }
+
   Future<Map<String, dynamic>> fetchCurrentUser() async {
     final token = await getToken();
     if (token == null) {
