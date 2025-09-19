@@ -7,7 +7,9 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import '../../services/laravel_service.dart';
+import '../../services/google_maps_service.dart';
 import '../map_selection_screen.dart';
+import 'offers_screen.dart';
 
 class DeliveryRequestScreen extends StatefulWidget {
   const DeliveryRequestScreen({Key? key}) : super(key: key);
@@ -36,11 +38,21 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
   
   // متغيرات السيكشنات الجديدة
   final _fareController = TextEditingController();
-  String? _customFare;
+
   String _deliveryTime = 'توصيل الآن';
   String _carCategory = 'اقتصادية';
   String _paymentMethod = 'كاش';
   int _estimatedDuration = 0;
+  
+  // متغيرات النظام المحدث للمسافات والأسعار
+  LatLng? _fromLocationCoords;
+  LatLng? _toLocationCoords;
+  List<LatLng> _multipleLocationCoords = [];
+  double? _estimatedPrice;
+  int? _estimatedDurationMinutes;
+  double? _totalDistanceKm;
+  bool _isCalculatingRoute = false;
+  DateTime? _scheduledDateTime;
   
   // قائمة المحافظات المصرية
   final List<String> _egyptianGovernorates = [
@@ -136,6 +148,7 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
           if (isFromLocation) {
             _fromLocationController.text = address;
             _fromLocationUrl = googleMapsUrl;
+            _fromLocationCoords = result; // حفظ الإحداثيات
             
             // استخراج المحافظة من موقع الانطلاق (بدون تحديث تلقائي)
             if (placemarks.isNotEmpty) {
@@ -152,7 +165,11 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
           } else {
             _toLocationController.text = address;
             _toLocationUrl = googleMapsUrl;
+            _toLocationCoords = result; // حفظ الإحداثيات
           }
+          
+          // حساب المسار والسعر تلقائياً إذا تم تحديد المواقع المطلوبة
+          _calculateRouteAndPrice();
         } catch (e) {
           print('خطأ في تحويل الإحداثيات: $e');
           // في حالة فشل تحويل الإحداثيات، استخدم الإحداثيات مباشرة
@@ -170,6 +187,79 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
       }
     } catch (e) {
       _showDialog('خطأ', 'حدث خطأ أثناء فتح الخريطة: $e');
+    }
+  }
+
+  // حساب المسافة والسعر بناءً على نوع الرحلة
+  Future<void> _calculateRouteAndPrice() async {
+    if (_selectedTripType == null) return;
+    
+    setState(() {
+      _isCalculatingRoute = true;
+      _estimatedPrice = null;
+      _estimatedDurationMinutes = null;
+      _totalDistanceKm = null;
+    });
+    
+    try {
+      Map<String, dynamic> result;
+      
+      switch (_selectedTripType) {
+        case 'ذهاب فقط':
+          if (_fromLocationCoords != null && _toLocationCoords != null) {
+            result = await GoogleMapsService.calculateDistanceAndTime(
+              origin: _fromLocationCoords!,
+              destination: _toLocationCoords!,
+            );
+          } else {
+            return; // لا توجد مواقع كافية للحساب
+          }
+          break;
+          
+        case 'ذهاب وعودة':
+          if (_fromLocationCoords != null && _toLocationCoords != null) {
+            result = await GoogleMapsService.calculateRoundTripRoute(
+              origin: _fromLocationCoords!,
+              destination: _toLocationCoords!,
+            );
+          } else {
+            return; // لا توجد مواقع كافية للحساب
+          }
+          break;
+          
+        case 'وجهات متعددة':
+          if (_fromLocationCoords != null && _multipleLocationCoords.isNotEmpty) {
+            result = await GoogleMapsService.calculateMultipleDestinationsRoute(
+              startPoint: _fromLocationCoords!,
+              destinations: _multipleLocationCoords,
+            );
+          } else {
+            return; // لا توجد مواقع كافية للحساب
+          }
+          break;
+          
+        default:
+          return;
+      }
+      
+      if (result['success']) {
+        setState(() {
+          _estimatedPrice = result['estimated_price'].toDouble();
+          _estimatedDurationMinutes = result['total_duration_minutes'] ?? result['duration_minutes'];
+          _totalDistanceKm = result['total_distance_km'] ?? result['distance_km'];
+          
+          // تحديث حقل السعر المقترح
+          _fareController.text = _estimatedPrice!.toStringAsFixed(0);
+        });
+      } else {
+        print('خطأ في حساب المسار: ${result['error']}');
+      }
+    } catch (e) {
+      print('خطأ في حساب المسار: $e');
+    } finally {
+      setState(() {
+        _isCalculatingRoute = false;
+      });
     }
   }
 
@@ -232,10 +322,10 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
             'starting_point': _startingPointController.text,
             'starting_point_url': _startingPointUrl,
             'destinations': destinations,
-            'passengers': int.parse(_passengersController.text),
+            'passengers': _passengersController.text.isNotEmpty ? int.tryParse(_passengersController.text) ?? 1 : 1,
             'client_notes': _notesController.text,
             'governorate': _selectedGovernorate,
-            'custom_fare': _customFare,
+    
             'delivery_time': _deliveryTime,
             'car_category': _carCategory,
             'payment_method': _paymentMethod,
@@ -253,10 +343,10 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
             'from_location_url': _fromLocationUrl,
             'to_location': _toLocationController.text,
             'to_location_url': _toLocationUrl,
-            'passengers': int.parse(_passengersController.text),
+            'passengers': _passengersController.text.isNotEmpty ? int.tryParse(_passengersController.text) ?? 1 : 1,
             'client_notes': _notesController.text,
             'governorate': _selectedGovernorate,
-            'custom_fare': _customFare,
+  
             'delivery_time': _deliveryTime,
             'car_category': _carCategory,
             'payment_method': _paymentMethod,
@@ -273,8 +363,12 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
       );
 
       if (result['status'] == true) {
-        _showDialog('نجح', 'تم إرسال طلب التوصيل بنجاح');
+        // التنقل إلى صفحة العروض مع تمرير معرف الطلب
+        final requestId = result['data']?['id'] ?? result['id'];
         _clearForm();
+        
+        // إظهار رسالة النجاح ثم التنقل
+        _showSuccessDialogAndNavigate('تم إرسال طلب التوصيل بنجاح', requestId);
       } else {
         _showDialog('خطأ', result['message'] ?? 'فشل في إرسال الطلب');
       }
@@ -308,7 +402,7 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
       _detectedGovernorateFromLocation = null;
       _selectedTripType = 'ذهاب فقط';
       _multipleDestinations.clear();
-      _customFare = null;
+  
       _deliveryTime = 'توصيل الآن';
       _carCategory = 'اقتصادية';
       _paymentMethod = 'كاش';
@@ -332,11 +426,20 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
     setState(() {
       _multipleDestinations[index]['controller'].dispose();
       _multipleDestinations.removeAt(index);
+      
+      // حذف الإحداثيات المقابلة إذا كانت موجودة
+      if (index < _multipleLocationCoords.length) {
+        _multipleLocationCoords.removeAt(index);
+      }
+      
       // إعادة ترقيم المحطات
       for (int i = 0; i < _multipleDestinations.length; i++) {
         _multipleDestinations[i]['name'] = 'المحطة ${i + 1}';
       }
     });
+    
+    // إعادة حساب المسار والسعر بعد حذف المحطة
+    _calculateRouteAndPrice();
   }
 
   // اختيار نقطة الانطلاق من الخريطة
@@ -358,7 +461,13 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
         setState(() {
           _startingPointController.text = address;
           _startingPointUrl = googleMapsUrl;
+          
+          // تحديث إحداثيات نقطة الانطلاق
+          _fromLocationCoords = LatLng(result.latitude, result.longitude);
         });
+        
+        // إعادة حساب المسار والسعر تلقائياً عند تحديد نقطة الانطلاق
+        _calculateRouteAndPrice();
       }
     } catch (e) {
       _showDialog('خطأ', 'حدث خطأ أثناء فتح الخريطة: $e');
@@ -384,7 +493,17 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
         setState(() {
           _multipleDestinations[index]['controller'].text = address;
           _multipleDestinations[index]['locationUrl'] = googleMapsUrl;
+          
+          // تحديث إحداثيات الوجهة
+          if (index < _multipleLocationCoords.length) {
+            _multipleLocationCoords[index] = LatLng(result.latitude, result.longitude);
+          } else {
+            _multipleLocationCoords.add(LatLng(result.latitude, result.longitude));
+          }
         });
+        
+        // إعادة حساب المسار والسعر تلقائياً عند تحديد موقع جديد
+        _calculateRouteAndPrice();
       }
     } catch (e) {
       _showDialog('خطأ', 'حدث خطأ أثناء فتح الخريطة: $e');
@@ -547,6 +666,49 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
                   if (title == 'نجح') {
                     context.pop(); // العودة للصفحة السابقة
                   }
+                },
+                child: const Text(
+                  'موافق',
+                  style: TextStyle(fontFamily: 'Cairo'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showSuccessDialogAndNavigate(String message, dynamic requestId) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            title: const Text(
+              'نجح',
+              style: TextStyle(fontFamily: 'Cairo'),
+            ),
+            content: Text(
+              message,
+              style: const TextStyle(fontFamily: 'Cairo'),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  // التنقل إلى صفحة العروض
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (context) => OffersScreen(
+                        deliveryRequestId: requestId?.toString() ?? '',
+                        fromLocation: _fromLocationController.text,
+                        toLocation: _toLocationController.text,
+                        requestedPrice: double.tryParse(_fareController.text) ?? 0.0,
+                      ),
+                    ),
+                  );
                 },
                 child: const Text(
                   'موافق',
@@ -763,158 +925,187 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFFC8700), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'أجرة التوصيلة',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF333333),
-              fontFamily: 'Cairo',
-            ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey[300]!),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  _customFare != null ? '$_customFare جنيه' : 'الأجرة الموصى بها',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey,
-                    fontFamily: 'Cairo',
-                  ),
-                ),
-                if (_customFare == null)
-                  const Text(
-                    '100 جنيه',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF333333),
-                      fontFamily: 'Cairo',
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          GestureDetector(
-            onTap: _showCustomFareDialog,
-            child: const Text(
-              'يمكنك اقتراح أجرة أخرى',
-              style: TextStyle(
+          Row(
+            children: [
+              const Icon(
+                Icons.attach_money,
                 color: Color(0xFFFC8700),
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                fontFamily: 'Cairo',
+                size: 24,
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // دالة إظهار حوار اقتراح أجرة مخصصة
-  void _showCustomFareDialog() {
-    final TextEditingController customFareController = TextEditingController();
-    
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return Directionality(
-          textDirection: TextDirection.rtl,
-          child: AlertDialog(
-            title: const Text(
-              'اقتراح أجرة مخصصة',
-              style: TextStyle(
-                fontFamily: 'Cairo',
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF333333),
-              ),
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'يمكنك اقتراح أجرة مختلفة للرحلة',
-                  style: TextStyle(
-                    fontFamily: 'Cairo',
-                    color: Colors.grey,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: customFareController,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    hintText: 'أدخل الأجرة المقترحة',
-                    hintStyle: const TextStyle(fontFamily: 'Cairo'),
-                    prefixIcon: const Icon(Icons.attach_money, color: Color(0xFFFC8700)),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFFFC8700)),
-                    ),
-                  ),
-                  style: const TextStyle(fontFamily: 'Cairo'),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                child: const Text(
-                  'إلغاء',
-                  style: TextStyle(
-                    fontFamily: 'Cairo',
-                    color: Colors.grey,
-                  ),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  if (customFareController.text.isNotEmpty) {
-                    setState(() {
-                      _customFare = customFareController.text;
-                      _fareController.text = '${customFareController.text} جنيه (مقترح)';
-                    });
-                  }
-                  Navigator.of(context).pop();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFC8700),
-                ),
-                child: const Text(
-                  'تأكيد',
-                  style: TextStyle(
-                    fontFamily: 'Cairo',
-                    color: Colors.white,
-                  ),
+              const SizedBox(width: 8),
+              const Text(
+                'أجرة التوصيلة',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF333333),
+                  fontFamily: 'Cairo',
                 ),
               ),
             ],
           ),
-        );
-      },
+          const SizedBox(height: 16),
+          // عرض السعر المقترح إذا كان متاحاً
+          if (_estimatedPrice != null)
+            Container(
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFC8700).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFC8700).withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.lightbulb_outline,
+                    color: const Color(0xFFFC8700),
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'السعر المقترح بناءً على المسافة',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFFC8700),
+                            fontFamily: 'Cairo',
+                          ),
+                        ),
+                        Text(
+                          '${_estimatedPrice!.toStringAsFixed(0)} جنيه',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFFC8700),
+                            fontFamily: 'Cairo',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      _fareController.text = _estimatedPrice!.toStringAsFixed(0);
+                    },
+                    child: const Text(
+                      'استخدام',
+                      style: TextStyle(
+                        color: Color(0xFFFC8700),
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Cairo',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          // حقل إدخال الأجرة
+          TextFormField(
+            controller: _fareController,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: 'أجرة التوصيلة (جنيه)',
+              labelStyle: const TextStyle(
+                fontFamily: 'Cairo',
+                color: Colors.grey,
+              ),
+              hintText: _estimatedPrice != null 
+                  ? 'السعر المقترح: ${_estimatedPrice!.toStringAsFixed(0)} جنيه'
+                  : 'أدخل أجرة التوصيلة',
+              hintStyle: TextStyle(
+                fontFamily: 'Cairo',
+                color: Colors.grey[400],
+              ),
+              prefixIcon: const Icon(
+                Icons.money,
+                color: Color(0xFFFC8700),
+              ),
+              suffixText: 'جنيه',
+              suffixStyle: const TextStyle(
+                fontFamily: 'Cairo',
+                color: Colors.grey,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFFC8700)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              filled: true,
+              fillColor: Colors.grey[50],
+            ),
+            style: const TextStyle(
+              fontFamily: 'Cairo',
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'يرجى إدخال أجرة التوصيلة';
+              }
+              final fare = double.tryParse(value);
+              if (fare == null || fare <= 0) {
+                return 'يرجى إدخال أجرة صحيحة';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 12),
+          // معلومة إضافية
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue[50],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue[200]!),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: Colors.blue[600],
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'يمكنك تعديل السعر المقترح حسب احتياجاتك. السعر النهائي قابل للتفاوض مع السائق.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.blue[700],
+                      fontFamily: 'Cairo',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1260,8 +1451,8 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    _estimatedDuration > 0 
-                        ? 'الرحلة تستغرق حوالي $_estimatedDuration دقيقة'
+                    (_estimatedDurationMinutes != null && _estimatedDurationMinutes! > 0) 
+                        ? 'الرحلة تستغرق حوالي ${_estimatedDurationMinutes} دقيقة'
                         : 'الرحلة تستغرق حوالي 20 دقيقة',
                     style: const TextStyle(
                       fontSize: 12,
@@ -1465,6 +1656,11 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
 
               const SizedBox(height: 24),
 
+              // قسم عرض تفاصيل المسار والسعر المحسوب
+              if (_isCalculatingRoute || _estimatedPrice != null) _buildRouteDetailsSection(),
+
+              if (_isCalculatingRoute || _estimatedPrice != null) const SizedBox(height: 24),
+
               // سيكشن أجرة التوصيلة
               _buildFareSection(),
 
@@ -1519,6 +1715,165 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
         ),
       ),
     )));
+  }
+
+  // بناء قسم تفاصيل المسار والسعر المحسوب
+  Widget _buildRouteDetailsSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFC8700), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.route,
+                color: Color(0xFFFC8700),
+                size: 24,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'تفاصيل المسار',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF333333),
+                  fontFamily: 'Cairo',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // عرض حالة الحساب أو النتائج
+          if (_isCalculatingRoute)
+            const Center(
+              child: Column(
+                children: [
+                  CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFC8700)),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'جاري حساب المسار...',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF666666),
+                      fontFamily: 'Cairo',
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else if (_estimatedPrice != null) ...[
+            // عرض المسافة الإجمالية
+            if (_totalDistanceKm != null)
+              _buildRouteDetailItem(
+                icon: Icons.straighten,
+                label: 'إجمالي المسافة',
+                value: '${_totalDistanceKm!.toStringAsFixed(1)} كم',
+                color: const Color(0xFF2196F3),
+              ),
+            
+            const SizedBox(height: 12),
+            
+            // عرض الوقت المقدر
+            if (_estimatedDurationMinutes != null)
+              _buildRouteDetailItem(
+                icon: Icons.access_time,
+                label: 'الوقت المقدر',
+                value: '${_estimatedDurationMinutes} دقيقة',
+                color: const Color(0xFF4CAF50),
+              ),
+            
+            const SizedBox(height: 12),
+            
+            // عرض السعر المقدر
+            _buildRouteDetailItem(
+              icon: Icons.attach_money,
+              label: 'السعر المقدر',
+              value: '${_estimatedPrice!.toStringAsFixed(0)} جنيه',
+              color: const Color(0xFFFC8700),
+            ),
+          ] else
+            const Center(
+              child: Text(
+                'يرجى تحديد المواقع لحساب تفاصيل المسار',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF666666),
+                  fontFamily: 'Cairo',
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+  
+  // دالة مساعدة لعرض عنصر تفاصيل المسار
+  Widget _buildRouteDetailItem({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3), width: 1),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            color: color,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF666666),
+                    fontFamily: 'Cairo',
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                    fontFamily: 'Cairo',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -2070,6 +2425,49 @@ class _MapSelectionDialogState extends State<_MapSelectionDialog> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // بناء قسم تفاصيل المسار والسعر المحسوب
+  Widget _buildRouteDetailsSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFC8700), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.route,
+                color: Color(0xFFFC8700),
+                size: 24,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'تفاصيل المسار',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF333333),
+                  fontFamily: 'Cairo',
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

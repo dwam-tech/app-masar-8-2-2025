@@ -89,6 +89,9 @@ import 'package:saba2v2/screens/user/delivery_request_screen.dart';
 import 'package:saba2v2/screens/user/car_rental_request_screen.dart';
 import 'package:saba2v2/screens/user/my_orders_screen.dart';
 import 'package:saba2v2/screens/user/favorites_screen.dart';
+import 'package:saba2v2/screens/driver/driver_requests_screen.dart';
+import 'package:saba2v2/screens/driver/submit_offer_screen.dart';
+import 'package:saba2v2/models/offer_model.dart';
 // إضافة NavigationService لاستخدام navigatorKey الخاص به مع GoRouter
 import 'package:saba2v2/screens/user/widgets/order_filter_widgets.dart';
 
@@ -465,6 +468,23 @@ class AppRouter {
           path: '/delivery-request',
           name: 'deliveryRequest',
           builder: (context, state) => const DeliveryRequestScreen(),
+        ),
+        // شاشات السائق
+        GoRoute(
+          path: '/driver-requests',
+          name: 'driverRequests',
+          builder: (context, state) => const DriverRequestsScreen(),
+        ),
+        GoRoute(
+          path: '/submit-offer/:requestId',
+          name: 'submitOffer',
+          builder: (context, state) {
+            final requestId = state.pathParameters['requestId']!;
+            final deliveryRequest = state.extra as DeliveryRequestModel;
+            return SubmitOfferScreen(
+              deliveryRequest: deliveryRequest,
+            );
+          },
         ),
         GoRoute(
           path: '/car-rental',
