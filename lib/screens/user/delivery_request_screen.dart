@@ -699,16 +699,11 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
                 onPressed: () {
                   Navigator.of(context).pop();
                   // التنقل إلى صفحة العروض
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (context) => OffersScreen(
-                        deliveryRequestId: requestId?.toString() ?? '',
-                        fromLocation: _fromLocationController.text,
-                        toLocation: _toLocationController.text,
-                        requestedPrice: double.tryParse(_fareController.text) ?? 0.0,
-                      ),
-                    ),
-                  );
+                  context.go('/offers/${requestId?.toString() ?? ''}', extra: {
+                    'fromLocation': _fromLocationController.text,
+                    'toLocation': _toLocationController.text,
+                    'requestedPrice': double.tryParse(_fareController.text) ?? 0.0,
+                  });
                 },
                 child: const Text(
                   'موافق',
