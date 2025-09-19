@@ -357,14 +357,19 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
 
       // إرسال الطلب باستخدام LaravelService
       final result = await LaravelService.post(
-        '/service-requests',
+        '/delivery/requests',
         data: requestData,
         token: token,
       );
 
       if (result['status'] == true) {
+        // طباعة الاستجابة للتحقق من هيكل البيانات
+        print('Response result: $result');
+        
         // التنقل إلى صفحة العروض مع تمرير معرف الطلب
         final requestId = result['data']?['id'] ?? result['id'];
+        print('Extracted requestId: $requestId');
+        
         _clearForm();
         
         // إظهار رسالة النجاح ثم التنقل
@@ -699,11 +704,16 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
                 onPressed: () {
                   Navigator.of(context).pop();
                   // التنقل إلى صفحة العروض
-                  context.go('/offers/${requestId?.toString() ?? ''}', extra: {
-                    'fromLocation': _fromLocationController.text,
-                    'toLocation': _toLocationController.text,
-                    'requestedPrice': double.tryParse(_fareController.text) ?? 0.0,
-                  });
+                  if (requestId != null && requestId.toString().isNotEmpty) {
+                    context.go('/offers/${requestId.toString()}', extra: {
+                      'fromLocation': _fromLocationController.text,
+                      'toLocation': _toLocationController.text,
+                      'requestedPrice': double.tryParse(_fareController.text) ?? 0.0,
+                    });
+                  } else {
+                     // في حالة عدم وجود requestId، العودة إلى الصفحة الرئيسية
+                     context.go('/UserHomeScreen');
+                   }
                 },
                 child: const Text(
                   'موافق',
