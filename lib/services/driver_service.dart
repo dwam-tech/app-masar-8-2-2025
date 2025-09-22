@@ -22,7 +22,7 @@ class DriverService {
   Future<List<DeliveryRequestModel>> fetchAvailableRequests() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/driver/available-requests'),
+        Uri.parse('$baseUrl/delivery/available-requests'),
         headers: _headers,
       );
 
@@ -46,7 +46,7 @@ class DriverService {
   Future<List<DeliveryRequestModel>> fetchMyOffers() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/driver/my-offers'),
+        Uri.parse('$baseUrl/delivery/my-offers'),
         headers: _headers,
       );
 
@@ -70,7 +70,7 @@ class DriverService {
   Future<List<DeliveryRequestModel>> fetchCompletedRequests() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/driver/completed-requests'),
+        Uri.parse('$baseUrl/delivery/completed-requests'),
         headers: _headers,
       );
 
