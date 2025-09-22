@@ -2,195 +2,201 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/offer_model.dart';
+import '../models/delivery_request_model.dart';
+import '../utils/constants.dart';
+import '../utils/auth_helper.dart';
 import 'laravel_service.dart';
 
 class OffersService {
-  static const String baseUrl = 'http://192.168.1.100:8000/api';
+  static const String baseUrl = Constants.baseUrl;
 
-  // الحصول على العروض لطلب توصيل معين
-  static Future<List<OfferModel>> getOffersForRequest(int requestId) async {
+  /// جلب تفاصيل طلب التوصيل مع العروض المرسلة
+  Future<Map<String, dynamic>> getDeliveryRequestWithOffers(String requestId) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token');
-      
+      final token = await AuthHelper.getToken();
       if (token == null) {
         throw Exception('لم يتم العثور على رمز المصادقة');
       }
 
       final response = await http.get(
-        Uri.parse('$baseUrl/delivery-requests/$requestId/offers'),
+        Uri.parse('$baseUrl/delivery/requests/$requestId/offers'),
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final List<dynamic> offersJson = data['data'] ?? [];
-        return offersJson.map((json) => OfferModel.fromJson(json)).toList();
+        return {
+          'success': true,
+          'deliveryRequest': DeliveryRequestModel.fromJson(data['data']['delivery_request']),
+          'offers': (data['data']['offers'] as List)
+              .map((offer) => OfferModel.fromJson(offer))
+              .toList(),
+          'message': data['message'] ?? 'تم جلب البيانات بنجاح',
+        };
+      } else if (response.statusCode == 401) {
+        throw Exception('انتهت صلاحية جلسة المستخدم، يرجى تسجيل الدخول مرة أخرى');
+      } else if (response.statusCode == 403) {
+        throw Exception('ليس لديك صلاحية للوصول إلى هذا الطلب');
+      } else if (response.statusCode == 404) {
+        throw Exception('لم يتم العثور على الطلب المحدد');
       } else {
-        throw Exception('فشل في جلب العروض: ${response.statusCode}');
+        final errorData = json.decode(response.body);
+        throw Exception(errorData['message'] ?? 'حدث خطأ أثناء جلب البيانات');
       }
     } catch (e) {
-      print('خطأ في جلب العروض: $e');
-      throw Exception('حدث خطأ أثناء جلب العروض');
+      if (e.toString().contains('SocketException') || e.toString().contains('TimeoutException')) {
+        throw Exception('تحقق من اتصالك بالإنترنت وحاول مرة أخرى');
+      }
+      rethrow;
     }
   }
 
-  // قبول عرض معين
-  static Future<bool> acceptOffer(int offerId) async {
+  /// قبول عرض معين
+  Future<Map<String, dynamic>> acceptOffer(String requestId, String offerId) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token');
-      
+      final token = await AuthHelper.getToken();
       if (token == null) {
         throw Exception('لم يتم العثور على رمز المصادقة');
       }
 
       final response = await http.post(
-        Uri.parse('$baseUrl/offers/$offerId/accept'),
+        Uri.parse('$baseUrl/delivery/requests/$requestId/offers/$offerId/accept'),
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-      );
-
-      if (response.statusCode == 200) {
-        return true;
-      } else {
-        throw Exception('فشل في قبول العرض: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('خطأ في قبول العرض: $e');
-      throw Exception('حدث خطأ أثناء قبول العرض');
-    }
-  }
-
-  // رفض عرض معين
-  static Future<bool> rejectOffer(int offerId) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token');
-      
-      if (token == null) {
-        throw Exception('لم يتم العثور على رمز المصادقة');
-      }
-
-      final response = await http.post(
-        Uri.parse('$baseUrl/offers/$offerId/reject'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        return true;
-      } else {
-        throw Exception('فشل في رفض العرض: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('خطأ في رفض العرض: $e');
-      throw Exception('حدث خطأ أثناء رفض العرض');
-    }
-  }
-
-  // إنشاء عرض مضاد
-  static Future<bool> createCounterOffer(int offerId, double newPrice, String? notes) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token');
-      
-      if (token == null) {
-        throw Exception('لم يتم العثور على رمز المصادقة');
-      }
-
-      final response = await http.post(
-        Uri.parse('$baseUrl/offers/$offerId/counter'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-        body: json.encode({
-          'new_price': newPrice,
-          'notes': notes,
-        }),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        return true;
+        final data = json.decode(response.body);
+        return {
+          'success': true,
+          'message': data['message'] ?? 'تم قبول العرض بنجاح',
+          'data': data['data'],
+        };
+      } else if (response.statusCode == 400) {
+        final errorData = json.decode(response.body);
+        throw Exception(errorData['message'] ?? 'بيانات غير صحيحة');
+      } else if (response.statusCode == 401) {
+        throw Exception('انتهت صلاحية جلسة المستخدم، يرجى تسجيل الدخول مرة أخرى');
+      } else if (response.statusCode == 403) {
+        throw Exception('ليس لديك صلاحية لقبول هذا العرض');
+      } else if (response.statusCode == 404) {
+        throw Exception('لم يتم العثور على العرض المحدد');
+      } else if (response.statusCode == 422) {
+        final errorData = json.decode(response.body);
+        String errorMessage = 'خطأ في البيانات المرسلة';
+        if (errorData['errors'] != null) {
+          final errors = errorData['errors'] as Map<String, dynamic>;
+          errorMessage = errors.values.first[0] ?? errorMessage;
+        }
+        throw Exception(errorMessage);
       } else {
-        throw Exception('فشل في إنشاء العرض المضاد: ${response.statusCode}');
+        final errorData = json.decode(response.body);
+        throw Exception(errorData['message'] ?? 'حدث خطأ أثناء قبول العرض');
       }
     } catch (e) {
-      print('خطأ في إنشاء العرض المضاد: $e');
-      throw Exception('حدث خطأ أثناء إنشاء العرض المضاد');
+      if (e.toString().contains('SocketException') || e.toString().contains('TimeoutException')) {
+        throw Exception('تحقق من اتصالك بالإنترنت وحاول مرة أخرى');
+      }
+      rethrow;
     }
   }
 
-  // الحصول على تفاصيل طلب التوصيل مع العروض
-  static Future<DeliveryRequestModel?> getDeliveryRequestWithOffers(int requestId) async {
+  /// تحديث حالة طلب التوصيل
+  Future<Map<String, dynamic>> refreshDeliveryRequestStatus(String requestId) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token');
-      
+      final token = await AuthHelper.getToken();
       if (token == null) {
         throw Exception('لم يتم العثور على رمز المصادقة');
       }
 
       final response = await http.get(
-        Uri.parse('$baseUrl/delivery-requests/$requestId'),
+        Uri.parse('$baseUrl/delivery/requests/$requestId'),
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        return DeliveryRequestModel.fromJson(data['data']);
+        return {
+          'success': true,
+          'deliveryRequest': DeliveryRequestModel.fromJson(data['data']),
+          'message': 'تم تحديث حالة الطلب بنجاح',
+        };
       } else {
-        throw Exception('فشل في جلب تفاصيل الطلب: ${response.statusCode}');
+        final errorData = json.decode(response.body);
+        throw Exception(errorData['message'] ?? 'حدث خطأ أثناء تحديث حالة الطلب');
       }
     } catch (e) {
-      print('خطأ في جلب تفاصيل الطلب: $e');
-      return null;
+      if (e.toString().contains('SocketException') || e.toString().contains('TimeoutException')) {
+        throw Exception('تحقق من اتصالك بالإنترنت وحاول مرة أخرى');
+      }
+      rethrow;
     }
   }
 
-  // إلغاء طلب التوصيل
-  static Future<bool> cancelDeliveryRequest(int requestId) async {
+  /// إلغاء طلب التوصيل
+  Future<Map<String, dynamic>> cancelDeliveryRequest(String requestId, String reason) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token');
-      
+      final token = await AuthHelper.getToken();
       if (token == null) {
         throw Exception('لم يتم العثور على رمز المصادقة');
       }
 
-      final response = await http.post(
-        Uri.parse('$baseUrl/delivery-requests/$requestId/cancel'),
+      final response = await http.patch(
+        Uri.parse('$baseUrl/delivery/requests/$requestId/cancel'),
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
+        body: json.encode({
+          'reason': reason,
+        }),
       );
 
       if (response.statusCode == 200) {
-        return true;
+        final data = json.decode(response.body);
+        return {
+          'success': true,
+          'message': data['message'] ?? 'تم إلغاء الطلب بنجاح',
+          'data': data['data'],
+        };
+      } else if (response.statusCode == 400) {
+        final errorData = json.decode(response.body);
+        throw Exception(errorData['message'] ?? 'بيانات غير صحيحة');
+      } else if (response.statusCode == 401) {
+        throw Exception('انتهت صلاحية جلسة المستخدم، يرجى تسجيل الدخول مرة أخرى');
+      } else if (response.statusCode == 403) {
+        throw Exception('ليس لديك صلاحية لإلغاء هذا الطلب');
+      } else if (response.statusCode == 404) {
+        throw Exception('لم يتم العثور على الطلب المحدد');
+      } else if (response.statusCode == 422) {
+        final errorData = json.decode(response.body);
+        String errorMessage = 'خطأ في البيانات المرسلة';
+        if (errorData['errors'] != null) {
+          final errors = errorData['errors'] as Map<String, dynamic>;
+          errorMessage = errors.values.first[0] ?? errorMessage;
+        }
+        throw Exception(errorMessage);
       } else {
-        throw Exception('فشل في إلغاء الطلب: ${response.statusCode}');
+        final errorData = json.decode(response.body);
+        throw Exception(errorData['message'] ?? 'حدث خطأ أثناء إلغاء الطلب');
       }
     } catch (e) {
-      print('خطأ في إلغاء الطلب: $e');
-      throw Exception('حدث خطأ أثناء إلغاء الطلب');
+      if (e.toString().contains('SocketException') || e.toString().contains('TimeoutException')) {
+        throw Exception('تحقق من اتصالك بالإنترنت وحاول مرة أخرى');
+      }
+      rethrow;
     }
   }
 }

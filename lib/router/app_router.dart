@@ -48,6 +48,7 @@ import 'package:saba2v2/screens/business/ResturantScreens/ResturantWorkeTime.dar
 import 'package:saba2v2/screens/restaurant_orders_screen.dart';
 import 'package:saba2v2/screens/business/RealStateScreens/SubscriptionRegistrationOfficeScreen.dart';
 import 'package:saba2v2/screens/business/RealStateScreens/SubscriptionRegistrationSingleScreen.dart';
+import 'package:saba2v2/screens/user/all_delivery_requests_screen.dart';
 import 'package:saba2v2/screens/business/CarsScreens/delivery_registration_screen.dart';
 import 'package:saba2v2/screens/business/cooking_registration_screen.dart';
 import 'package:saba2v2/screens/business/RealStateScreens/realState.dart';
@@ -93,6 +94,7 @@ import 'package:saba2v2/screens/driver/driver_requests_screen.dart';
 import 'package:saba2v2/screens/driver/submit_offer_screen.dart';
 import 'package:saba2v2/screens/user/offers_screen.dart';
 import 'package:saba2v2/models/offer_model.dart';
+import 'package:saba2v2/models/delivery_request_model.dart';
 // إضافة NavigationService لاستخدام navigatorKey الخاص به مع GoRouter
 import 'package:saba2v2/screens/user/widgets/order_filter_widgets.dart';
 
@@ -401,6 +403,11 @@ class AppRouter {
           builder: (context, state) => const UserRestaurantHome(),
         ),
         GoRoute(
+          path: '/all-delivery-requests',
+          name: 'allDeliveryRequests',
+          builder: (context, state) => const AllDeliveryRequestsScreen(),
+        ),
+        GoRoute(
           path: '/profile',
           name: 'profile',
           builder: (context, state) => const ProfileScreen(),
@@ -477,10 +484,11 @@ class AppRouter {
             final requestId = state.pathParameters['requestId']!;
             final extra = state.extra as Map<String, dynamic>? ?? {};
             return OffersScreen(
-              deliveryRequestId: requestId,
+              deliveryRequestId: int.parse(requestId),
               fromLocation: extra['fromLocation'] ?? '',
               toLocation: extra['toLocation'] ?? '',
               requestedPrice: extra['requestedPrice'] ?? 0.0,
+              estimatedDurationMinutes: extra['estimatedDurationMinutes'] ?? 0,
             );
           },
         ),

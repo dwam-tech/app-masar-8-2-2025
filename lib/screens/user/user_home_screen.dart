@@ -614,6 +614,9 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                                 if (category.title == 'حجز الفنادق') {
                                   context.push('/hotel-search');
                                 }
+                                if (category.title == 'طلبات التوصيل') {
+                                  context.push('/all-delivery-requests');
+                                }
                               },
                             );
                           },

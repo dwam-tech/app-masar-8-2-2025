@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/laravel_service.dart';
 import '../../models/offer_model.dart';
+import '../../models/delivery_request_model.dart';
 import 'submit_offer_screen.dart';
 
 const String baseUrl = 'https://msar.app';

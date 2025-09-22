@@ -6,10 +6,22 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:provider/provider.dart';
 import '../../services/laravel_service.dart';
 import '../../services/google_maps_service.dart';
+import '../../providers/auth_provider.dart';
 import '../map_selection_screen.dart';
 import 'offers_screen.dart';
+import 'widgets/map_selection_dialog.dart';
+import 'widgets/trip_type_button.dart';
+import 'widgets/fare_section.dart';
+import 'widgets/delivery_time_section.dart';
+import 'widgets/car_category_section.dart';
+import 'widgets/payment_method_section.dart';
+import 'package:saba2v2/widgets/delivery_request/note_section.dart';
+import 'package:saba2v2/widgets/delivery_request/trip_type_section.dart';
+import 'package:saba2v2/widgets/delivery_request/route_details_section.dart';
+import 'package:saba2v2/widgets/estimated_duration_section.dart';
 
 class DeliveryRequestScreen extends StatefulWidget {
   const DeliveryRequestScreen({Key? key}) : super(key: key);
@@ -123,7 +135,7 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
 
       final result = await showDialog<LatLng>(
         context: context,
-        builder: (context) => _MapSelectionDialog(initialPosition: initialPosition),
+        builder: (context) => MapSelectionDialog(initialPosition: initialPosition),
       );
 
       if (result != null) {
@@ -303,55 +315,145 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
       // إعداد بيانات الطلب حسب نوع الرحلة
       Map<String, dynamic> requestData;
       
+      // تحويل نوع الرحلة إلى القيم المتوقعة في الباك إند
+      String backendTripType;
+      switch (_selectedTripType) {
+        case 'ذهاب فقط':
+          backendTripType = 'one_way';
+          break;
+        case 'ذهاب وعودة':
+          backendTripType = 'round_trip';
+          break;
+        case 'وجهات متعددة':
+          backendTripType = 'multiple_destinations';
+          break;
+        default:
+          backendTripType = 'one_way';
+      }
+      
+      // تحويل فئة السيارة إلى القيم المتوقعة في الباك إند
+      String backendCarCategory;
+      switch (_carCategory) {
+        case 'اقتصادية':
+          backendCarCategory = 'economy';
+          break;
+        case 'مريحة':
+          backendCarCategory = 'comfort';
+          break;
+        case 'فاخرة':
+          backendCarCategory = 'premium';
+          break;
+        case 'فان':
+          backendCarCategory = 'van';
+          break;
+        default:
+          backendCarCategory = 'economy';
+      }
+      
+      // تحويل طريقة الدفع إلى القيم المتوقعة في الباك إند
+      String backendPaymentMethod;
+      switch (_paymentMethod) {
+        case 'كاش':
+          backendPaymentMethod = 'cash';
+          break;
+        case 'تحويل بنكي':
+          backendPaymentMethod = 'bank_transfer';
+          break;
+        case 'كارت':
+          backendPaymentMethod = 'card';
+          break;
+        default:
+          backendPaymentMethod = 'cash';
+      }
+      
+      // تحديد وقت التوصيل
+      DateTime deliveryDateTime;
+      if (_deliveryTime == 'توصيل الآن') {
+        deliveryDateTime = DateTime.now().add(Duration(minutes: 15)); // إضافة 15 دقيقة للوقت الحالي
+      } else if (_scheduledDateTime != null) {
+        deliveryDateTime = _scheduledDateTime!;
+      } else {
+        deliveryDateTime = DateTime.now().add(Duration(minutes: 15));
+      }
+      
       if (_selectedTripType == 'وجهات متعددة') {
         // إعداد بيانات الوجهات المتعددة
-        List<Map<String, String>> destinations = [];
-        for (var destination in _multipleDestinations) {
+        List<Map<String, dynamic>> destinations = [];
+        
+        // إضافة نقطة الانطلاق كأول وجهة (pickup point)
+        if (_startingPointController.text.isNotEmpty) {
           destinations.add({
-            'location': destination['controller'].text,
-            'location_url': destination['locationUrl'] ?? '',
-            'name': destination['name'],
+            'location_name': _startingPointController.text,
+            'latitude': _fromLocationCoords?.latitude,
+            'longitude': _fromLocationCoords?.longitude,
+            'address': _startingPointController.text,
+            'is_pickup_point': true,
+            'is_dropoff_point': false,
+          });
+        }
+        
+        // إضافة باقي الوجهات
+        for (int i = 0; i < _multipleDestinations.length; i++) {
+          var destination = _multipleDestinations[i];
+          LatLng? coords = i < _multipleLocationCoords.length ? _multipleLocationCoords[i] : null;
+          
+          destinations.add({
+            'location_name': destination['controller'].text,
+            'latitude': coords?.latitude,
+            'longitude': coords?.longitude,
+            'address': destination['controller'].text,
+            'is_pickup_point': false,
+            'is_dropoff_point': true,
           });
         }
         
         requestData = {
-          'type': 'delivery',
-          'governorate': _selectedGovernorate,
-          'request_data': {
-            'trip_type': _selectedTripType,
-            'starting_point': _startingPointController.text,
-            'starting_point_url': _startingPointUrl,
-            'destinations': destinations,
-            'passengers': _passengersController.text.isNotEmpty ? int.tryParse(_passengersController.text) ?? 1 : 1,
-            'client_notes': _notesController.text,
-            'governorate': _selectedGovernorate,
-    
-            'delivery_time': _deliveryTime,
-            'car_category': _carCategory,
-            'payment_method': _paymentMethod,
-            'estimated_duration': _estimatedDuration,
-          },
+          'trip_type': backendTripType,
+          'delivery_time': deliveryDateTime.toIso8601String(),
+          'car_category': backendCarCategory,
+          'payment_method': backendPaymentMethod,
+          'price': _fareController.text.isNotEmpty ? double.tryParse(_fareController.text) : _estimatedPrice,
+          'client_notes': _notesController.text,
+          'phone': Provider.of<AuthProvider>(context, listen: false).userPhone ?? '',
+          'destinations': destinations,
         };
       } else {
         // إعداد بيانات الرحلة التقليدية (ذهاب فقط أو ذهاب وعودة)
+        List<Map<String, dynamic>> destinations = [];
+        
+        // إضافة نقطة الانطلاق
+        if (_fromLocationController.text.isNotEmpty) {
+          destinations.add({
+            'location_name': _fromLocationController.text,
+            'latitude': _fromLocationCoords?.latitude,
+            'longitude': _fromLocationCoords?.longitude,
+            'address': _fromLocationController.text,
+            'is_pickup_point': true,
+            'is_dropoff_point': false,
+          });
+        }
+        
+        // إضافة نقطة الوصول
+        if (_toLocationController.text.isNotEmpty) {
+          destinations.add({
+            'location_name': _toLocationController.text,
+            'latitude': _toLocationCoords?.latitude,
+            'longitude': _toLocationCoords?.longitude,
+            'address': _toLocationController.text,
+            'is_pickup_point': false,
+            'is_dropoff_point': true,
+          });
+        }
+        
         requestData = {
-          'type': 'delivery',
-          'governorate': _selectedGovernorate,
-          'request_data': {
-            'trip_type': _selectedTripType,
-            'from_location': _fromLocationController.text,
-            'from_location_url': _fromLocationUrl,
-            'to_location': _toLocationController.text,
-            'to_location_url': _toLocationUrl,
-            'passengers': _passengersController.text.isNotEmpty ? int.tryParse(_passengersController.text) ?? 1 : 1,
-            'client_notes': _notesController.text,
-            'governorate': _selectedGovernorate,
-  
-            'delivery_time': _deliveryTime,
-            'car_category': _carCategory,
-            'payment_method': _paymentMethod,
-            'estimated_duration': _estimatedDuration,
-          },
+          'trip_type': backendTripType,
+          'delivery_time': deliveryDateTime.toIso8601String(),
+          'car_category': backendCarCategory,
+          'payment_method': backendPaymentMethod,
+          'price': _fareController.text.isNotEmpty ? double.tryParse(_fareController.text) : _estimatedPrice,
+          'client_notes': _notesController.text,
+          'phone': Provider.of<AuthProvider>(context, listen: false).userPhone ?? '',
+          'destinations': destinations,
         };
       }
 
@@ -367,13 +469,35 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
         print('Response result: $result');
         
         // التنقل إلى صفحة العروض مع تمرير معرف الطلب
-        final requestId = result['data']?['id'] ?? result['id'];
+        // استخراج معرف الطلب من الاستجابة - الخادم يرجع البيانات في data.delivery_request
+        dynamic requestId;
+        if (result['data'] != null && result['data']['delivery_request'] != null && result['data']['delivery_request']['id'] != null) {
+          requestId = result['data']['delivery_request']['id'];
+        } else if (result['delivery_request'] != null && result['delivery_request']['id'] != null) {
+          requestId = result['delivery_request']['id'];
+        } else if (result['data'] != null && result['data']['id'] != null) {
+          requestId = result['data']['id'];
+        } else if (result['id'] != null) {
+          requestId = result['id'];
+        }
+        
+        // طباعة تفاصيل إضافية للتشخيص
+        print('Full response structure: ${result.keys}');
+        if (result['data'] != null && result['data']['delivery_request'] != null) {
+          print('data.delivery_request keys: ${result['data']['delivery_request'].keys}');
+          print('data.delivery_request id: ${result['data']['delivery_request']['id']}');
+        }
+        
         print('Extracted requestId: $requestId');
         
         _clearForm();
         
         // إظهار رسالة النجاح ثم التنقل
-        _showSuccessDialogAndNavigate('تم إرسال طلب التوصيل بنجاح', requestId);
+        if (requestId != null) {
+          _showSuccessDialogAndNavigate('تم إرسال طلب التوصيل بنجاح', requestId);
+        } else {
+          _showDialog('تحذير', 'تم إرسال الطلب بنجاح ولكن لم يتم العثور على معرف الطلب');
+        }
       } else {
         _showDialog('خطأ', result['message'] ?? 'فشل في إرسال الطلب');
       }
@@ -413,6 +537,14 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
       _paymentMethod = 'كاش';
       _estimatedDuration = 0;
     });
+  }
+
+  void _onTripTypeSelected(String title) {
+    setState(() {
+      _selectedTripType = title;
+    });
+    // إعادة حساب المسار عند تغيير نوع الرحلة
+    _calculateRouteAndPrice();
   }
 
   // إضافة محطة جديدة للوجهات المتعددة
@@ -702,18 +834,28 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
             actions: [
               TextButton(
                 onPressed: () {
-                  Navigator.of(context).pop();
-                  // التنقل إلى صفحة العروض
-                  if (requestId != null && requestId.toString().isNotEmpty) {
-                    context.go('/offers/${requestId.toString()}', extra: {
-                      'fromLocation': _fromLocationController.text,
-                      'toLocation': _toLocationController.text,
-                      'requestedPrice': double.tryParse(_fareController.text) ?? 0.0,
-                    });
-                  } else {
-                     // في حالة عدم وجود requestId، العودة إلى الصفحة الرئيسية
-                     context.go('/UserHomeScreen');
-                   }
+                  // أغلق الحوار أولاً باستخدام سياق الحوار، ثم استخدم سياق الصفحة الأصلية للتوجيه
+                  final dialogContext = context;
+                  Navigator.of(dialogContext, rootNavigator: true).pop();
+                  final parentContext = this.context;
+                  Future.microtask(() {
+                    if (requestId != null && requestId.toString().isNotEmpty) {
+                      // التنقل مباشرة إلى صفحة العروض مع تمرير البيانات المطلوبة
+                      Navigator.of(parentContext).pushReplacement(
+                        MaterialPageRoute(
+                          builder: (context) => OffersScreen(
+                            deliveryRequestId: int.parse(requestId.toString()),
+                            fromLocation: _fromLocationController.text,
+                            toLocation: _toLocationController.text,
+                            requestedPrice: _estimatedPrice ?? 0.0,
+                            estimatedDurationMinutes: _estimatedDurationMinutes ?? 0,
+                          ),
+                        ),
+                      );
+                    } else {
+                      GoRouter.of(parentContext).go('/UserHomeScreen');
+                    }
+                  });
                 },
                 child: const Text(
                   'موافق',
@@ -727,51 +869,7 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
     );
   }
 
-  // بناء زر اختيار نوع الرحلة
-  Widget _buildTripTypeButton(String tripType) {
-    bool isSelected = _selectedTripType == tripType;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedTripType = tripType;
-          // تنظيف الوجهات المتعددة عند تغيير نوع الرحلة
-          if (tripType != 'وجهات متعددة') {
-            for (var destination in _multipleDestinations) {
-              destination['controller'].dispose();
-            }
-            _multipleDestinations.clear();
-          }
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12,horizontal: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFFC8700) : Colors.grey[100],
-          borderRadius: BorderRadius.circular(100),
-          border: Border.all(
-            color: isSelected ? const Color(0xFFFC8700) : Colors.grey[300]!,
-            width: 1,
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-           
-            Text(
-              tripType,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: isSelected ? Colors.white : Colors.grey[700],
-                fontFamily: 'Cairo',
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+
 
   // بناء واجهة الوجهات المتعددة
   Widget _buildMultipleDestinationsSection() {
@@ -924,555 +1022,19 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
     );
   }
 
-  // بناء سيكشن أجرة التوصيلة
-  Widget _buildFareSection() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFC8700), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.attach_money,
-                color: Color(0xFFFC8700),
-                size: 24,
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'أجرة التوصيلة',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF333333),
-                  fontFamily: 'Cairo',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          // عرض السعر المقترح إذا كان متاحاً
-          if (_estimatedPrice != null)
-            Container(
-              padding: const EdgeInsets.all(12),
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFC8700).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFFC8700).withOpacity(0.3)),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.lightbulb_outline,
-                    color: const Color(0xFFFC8700),
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'السعر المقترح بناءً على المسافة',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFFFC8700),
-                            fontFamily: 'Cairo',
-                          ),
-                        ),
-                        Text(
-                          '${_estimatedPrice!.toStringAsFixed(0)} جنيه',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFFC8700),
-                            fontFamily: 'Cairo',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      _fareController.text = _estimatedPrice!.toStringAsFixed(0);
-                    },
-                    child: const Text(
-                      'استخدام',
-                      style: TextStyle(
-                        color: Color(0xFFFC8700),
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Cairo',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          // حقل إدخال الأجرة
-          TextFormField(
-            controller: _fareController,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: 'أجرة التوصيلة (جنيه)',
-              labelStyle: const TextStyle(
-                fontFamily: 'Cairo',
-                color: Colors.grey,
-              ),
-              hintText: _estimatedPrice != null 
-                  ? 'السعر المقترح: ${_estimatedPrice!.toStringAsFixed(0)} جنيه'
-                  : 'أدخل أجرة التوصيلة',
-              hintStyle: TextStyle(
-                fontFamily: 'Cairo',
-                color: Colors.grey[400],
-              ),
-              prefixIcon: const Icon(
-                Icons.money,
-                color: Color(0xFFFC8700),
-              ),
-              suffixText: 'جنيه',
-              suffixStyle: const TextStyle(
-                fontFamily: 'Cairo',
-                color: Colors.grey,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: Colors.grey[300]!),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFFFC8700)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: Colors.grey[300]!),
-              ),
-              filled: true,
-              fillColor: Colors.grey[50],
-            ),
-            style: const TextStyle(
-              fontFamily: 'Cairo',
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'يرجى إدخال أجرة التوصيلة';
-              }
-              final fare = double.tryParse(value);
-              if (fare == null || fare <= 0) {
-                return 'يرجى إدخال أجرة صحيحة';
-              }
-              return null;
-            },
-          ),
-          const SizedBox(height: 12),
-          // معلومة إضافية
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.blue[50],
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.blue[200]!),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.info_outline,
-                  color: Colors.blue[600],
-                  size: 16,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'يمكنك تعديل السعر المقترح حسب احتياجاتك. السعر النهائي قابل للتفاوض مع السائق.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.blue[700],
-                      fontFamily: 'Cairo',
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // بناء سيكشن وقت التوصيل
-  Widget _buildDeliveryTimeSection() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFFC8700), width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'وقت التوصيل',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF333333),
-              fontFamily: 'Cairo',
-            ),
-          ),
-          const SizedBox(height: 16),
-          // خيار توصيل الآن
-          GestureDetector(
-            onTap: () {
-              setState(() {
-                _deliveryTime = 'توصيل الآن';
-              });
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
-              decoration: _deliveryTime == 'توصيل الآن' ? BoxDecoration(
-                border: Border.all(
-                  color: const Color(0xFFFC8700),
-                ),
-                borderRadius: BorderRadius.all(Radius.circular(8)),
-              ) : null,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'توصيل الآن',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontFamily: 'Cairo',
-                      color: Color(0xFF333333),
-                    ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    width: 20,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: _deliveryTime == 'توصيل الآن' ? const Color(0xFFFC8700) : Colors.grey[400]!,
-                        width: 2,
-                      ),
-                    ),
-                    child: _deliveryTime == 'توصيل الآن'
-                        ? Container(
-                            margin: const EdgeInsets.all(3),
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Color(0xFFFC8700),
-                            ),
-                          )
-                        : null,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // خيار تحديد الوقت
-          GestureDetector(
-            onTap: () {
-              setState(() {
-                _deliveryTime = 'تحديد الوقت';
-              });
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
-              decoration: _deliveryTime == 'تحديد الوقت' ? BoxDecoration(
-                border: Border.all(
-                  color: const Color(0xFFFC8700),
-                ),
-                borderRadius: BorderRadius.all(Radius.circular(8)),
-              ) : null,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'تحديد الوقت',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontFamily: 'Cairo',
-                      color: Color(0xFF333333),
-                    ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    width: 20,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: _deliveryTime == 'تحديد الوقت' ? const Color(0xFFFC8700) : Colors.grey[400]!,
-                        width: 2,
-                      ),
-                    ),
-                    child: _deliveryTime == 'تحديد الوقت'
-                        ? Container(
-                            margin: const EdgeInsets.all(3),
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Color(0xFFFC8700),
-                            ),
-                          )
-                        : null,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
 
 
-  // بناء سيكشن فئة السيارة
-  Widget _buildCarCategorySection() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFFC8700), width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'فئة السيارة',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF333333),
-              fontFamily: 'Cairo',
-            ),
-          ),
-          const SizedBox(height: 16),
-          // خيار اقتصادية
-          _buildCarCategoryRadioOption('اقتصادية'),
-          // خيار مميزة
-          _buildCarCategoryRadioOption('مميزة'),
-
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCarCategoryRadioOption(String category) {
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _carCategory = category;
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
-        decoration: _carCategory == category ? BoxDecoration(
-          border: Border.all(
-            color: const Color(0xFFFC8700),
-          ),
-          borderRadius: BorderRadius.all(Radius.circular(8)),
-        ) : null,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              category,
-              style: const TextStyle(
-                fontSize: 14,
-                fontFamily: 'Cairo',
-                color: Color(0xFF333333),
-              ),
-            ),
-            const Spacer(),
-            Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: _carCategory == category ? const Color(0xFFFC8700) : Colors.grey[400]!,
-                  width: 2,
-                ),
-              ),
-              child: _carCategory == category
-                  ? Container(
-                      margin: const EdgeInsets.all(3),
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Color(0xFFFC8700),
-                      ),
-                    )
-                  : null,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
 
 
-  // بناء سيكشن طريقة الدفع
-  Widget _buildPaymentMethodSection() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFFC8700), width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'طريقة الدفع',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF333333),
-              fontFamily: 'Cairo',
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey[300]!, width: 1),
-              borderRadius: BorderRadius.circular(8),
-              color: Colors.grey[50],
-            ),
-            child: Directionality(
-              textDirection: TextDirection.rtl,
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: _paymentMethod,
-                  isExpanded: true,
-                  icon: const Icon(
-                    Icons.keyboard_arrow_down,
-                    color: Color(0xFFFC8700),
-                    size: 24,
-                  ),
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontFamily: 'Cairo',
-                    color: Color(0xFF333333),
-                  ),
-                  dropdownColor: Colors.white,
-                  items: ['كاش', 'فيزا'].map<DropdownMenuItem<String>>((String value) {
-                    return DropdownMenuItem<String>(
-                      value: value,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: Text(
-                            value,
-                            textAlign: TextAlign.right,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontFamily: 'Cairo',
-                              color: Color(0xFF333333),
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (String? newValue) {
-                    if (newValue != null) {
-                      setState(() {
-                        _paymentMethod = newValue;
-                      });
-                    }
-                  },
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  // بناء سيكشن مدة الرحلة المتوقعة
-  Widget _buildEstimatedDurationSection() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFFC8700), width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'مدة الرحلة المتوقعة',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF333333),
-              fontFamily: 'Cairo',
-            ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey[300]!),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Icon(
-                  Icons.info_outline,
-                  color: Color(0xFFFC8700),
-                  size: 16,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    (_estimatedDurationMinutes != null && _estimatedDurationMinutes! > 0) 
-                        ? 'الرحلة تستغرق حوالي ${_estimatedDurationMinutes} دقيقة'
-                        : 'الرحلة تستغرق حوالي 20 دقيقة',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF666666),
-                      fontFamily: 'Cairo',
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+
+
+
+
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -1534,15 +1096,27 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
                     Row(
                       children: [
                         Expanded(
-                          child: _buildTripTypeButton('ذهاب فقط'),
+                          child: TripTypeButton(
+                            tripType: 'ذهاب فقط',
+                            isSelected: _selectedTripType == 'ذهاب فقط',
+                            onTap: () => _onTripTypeSelected('ذهاب فقط'),
+                          ),
                         ),
                         const SizedBox(width: 6),
                         Expanded(
-                          child: _buildTripTypeButton('ذهاب وعودة'),
+                          child: TripTypeButton(
+                            tripType: 'ذهاب وعودة',
+                            isSelected: _selectedTripType == 'ذهاب وعودة',
+                            onTap: () => _onTripTypeSelected('ذهاب وعودة'),
+                          ),
                         ),
                         const SizedBox(width: 6),
                         Expanded(
-                          child: _buildTripTypeButton('وجهات متعددة'),
+                          child: TripTypeButton(
+                            tripType: 'وجهات متعددة',
+                            isSelected: _selectedTripType == 'وجهات متعددة',
+                            onTap: () => _onTripTypeSelected('وجهات متعددة'),
+                          ),
                         ),
                       ],
                     ),
@@ -1662,32 +1236,149 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
               const SizedBox(height: 24),
 
               // قسم عرض تفاصيل المسار والسعر المحسوب
-              if (_isCalculatingRoute || _estimatedPrice != null) _buildRouteDetailsSection(),
+              if (_isCalculatingRoute || _estimatedPrice != null)
+                RouteDetailsSection(
+                  isCalculatingRoute: _isCalculatingRoute,
+                  totalDistanceKm: _totalDistanceKm,
+                  estimatedDurationMinutes: _estimatedDurationMinutes,
+                  estimatedPrice: _estimatedPrice,
+                ),
 
               if (_isCalculatingRoute || _estimatedPrice != null) const SizedBox(height: 24),
 
               // سيكشن أجرة التوصيلة
-              _buildFareSection(),
+              FareSection(fareController: _fareController, estimatedPrice: _estimatedPrice),
 
               const SizedBox(height: 24),
 
               // سيكشن وقت التوصيل
-              _buildDeliveryTimeSection(),
+              DeliveryTimeSection(
+                deliveryTime: _deliveryTime,
+                onDeliveryTimeChanged: (newTime) {
+                  setState(() {
+                    _deliveryTime = newTime;
+                  });
+                },
+              ),
 
               const SizedBox(height: 24),
 
               // سيكشن فئة السيارة
-              _buildCarCategorySection(),
+              CarCategorySection(
+                carCategory: _carCategory,
+                onCarCategoryChanged: (newCategory) {
+                  setState(() {
+                    _carCategory = newCategory;
+                  });
+                },
+              ),
 
               const SizedBox(height: 24),
 
               // سيكشن طريقة الدفع
-              _buildPaymentMethodSection(),
+              PaymentMethodSection(
+                paymentMethod: _paymentMethod,
+                onPaymentMethodChanged: (newValue) {
+                  setState(() {
+                    _paymentMethod = newValue!;
+                  });
+                },
+              ),
 
               const SizedBox(height: 24),
 
               // سيكشن مدة الرحلة المتوقعة
-              _buildEstimatedDurationSection(),
+              EstimatedDurationSection(estimatedDurationMinutes: _estimatedDurationMinutes),
+
+              const SizedBox(height: 24),
+
+              // عرض رقم الهاتف من البروفايل
+              Consumer<AuthProvider>(
+                builder: (context, authProvider, child) {
+                  final userPhone = authProvider.userPhone;
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFC8700), width: 1),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.phone, color: Color(0xFFFC8700)),
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'رقم الهاتف',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey,
+                                fontFamily: 'Cairo',
+                              ),
+                            ),
+                            Text(
+                              userPhone ?? 'غير محدد',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF333333),
+                                fontFamily: 'Cairo',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 24),
+
+              // حقل الملاحظات
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFFC8700), width: 1),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'ملاحظات إضافية (اختياري)',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF333333),
+                        fontFamily: 'Cairo',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _notesController,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        hintText: 'أدخل أي ملاحظات إضافية (اختياري)',
+                        hintStyle: const TextStyle(fontFamily: 'Cairo'),
+                        prefixIcon: const Icon(Icons.note, color: Color(0xFFFC8700)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Color(0xFFFC8700)),
+                        ),
+                      ),
+                      style: const TextStyle(fontFamily: 'Cairo'),
+                    ),
+                  ],
+                ),
+              ),
 
               const SizedBox(height: 32),
 
@@ -1722,758 +1413,5 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
     )));
   }
 
-  // بناء قسم تفاصيل المسار والسعر المحسوب
-  Widget _buildRouteDetailsSection() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFC8700), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.route,
-                color: Color(0xFFFC8700),
-                size: 24,
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'تفاصيل المسار',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF333333),
-                  fontFamily: 'Cairo',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          
-          // عرض حالة الحساب أو النتائج
-          if (_isCalculatingRoute)
-            const Center(
-              child: Column(
-                children: [
-                  CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFC8700)),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'جاري حساب المسار...',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF666666),
-                      fontFamily: 'Cairo',
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else if (_estimatedPrice != null) ...[
-            // عرض المسافة الإجمالية
-            if (_totalDistanceKm != null)
-              _buildRouteDetailItem(
-                icon: Icons.straighten,
-                label: 'إجمالي المسافة',
-                value: '${_totalDistanceKm!.toStringAsFixed(1)} كم',
-                color: const Color(0xFF2196F3),
-              ),
-            
-            const SizedBox(height: 12),
-            
-            // عرض الوقت المقدر
-            if (_estimatedDurationMinutes != null)
-              _buildRouteDetailItem(
-                icon: Icons.access_time,
-                label: 'الوقت المقدر',
-                value: '${_estimatedDurationMinutes} دقيقة',
-                color: const Color(0xFF4CAF50),
-              ),
-            
-            const SizedBox(height: 12),
-            
-            // عرض السعر المقدر
-            _buildRouteDetailItem(
-              icon: Icons.attach_money,
-              label: 'السعر المقدر',
-              value: '${_estimatedPrice!.toStringAsFixed(0)} جنيه',
-              color: const Color(0xFFFC8700),
-            ),
-          ] else
-            const Center(
-              child: Text(
-                'يرجى تحديد المواقع لحساب تفاصيل المسار',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF666666),
-                  fontFamily: 'Cairo',
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-  
-  // دالة مساعدة لعرض عنصر تفاصيل المسار
-  Widget _buildRouteDetailItem({
-    required IconData icon,
-    required String label,
-    required String value,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3), width: 1),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            color: color,
-            size: 20,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF666666),
-                    fontFamily: 'Cairo',
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                    fontFamily: 'Cairo',
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
-// Dialog لاختيار الموقع من الخريطة
-class _MapSelectionDialog extends StatefulWidget {
-  final LatLng initialPosition;
-
-  const _MapSelectionDialog({Key? key, required this.initialPosition}) : super(key: key);
-
-  @override
-  State<_MapSelectionDialog> createState() => _MapSelectionDialogState();
-}
-
-class _MapSelectionDialogState extends State<_MapSelectionDialog> {
-  GoogleMapController? _mapController;
-  LatLng? _selectedPosition;
-  Set<Marker> _markers = {};
-  final TextEditingController _searchController = TextEditingController();
-  bool _isSearching = false;
-  List<Location> _searchResults = [];
-  String? _selectedLocationName;
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedPosition = widget.initialPosition;
-    _markers.add(
-      Marker(
-        markerId: const MarkerId('selected'),
-        position: widget.initialPosition,
-        draggable: true,
-        onDragEnd: (LatLng position) {
-          setState(() {
-            _selectedPosition = position;
-            _selectedLocationName = null;
-          });
-        },
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  // البحث عن الموقع باستخدام الاسم
-  Future<void> _searchLocation(String query) async {
-    if (query.trim().isEmpty) {
-      setState(() {
-        _searchResults.clear();
-      });
-      return;
-    }
-
-    setState(() {
-      _isSearching = true;
-      _searchResults.clear();
-    });
-
-    try {
-      List<Location> locations = await locationFromAddress(query);
-      setState(() {
-        _searchResults = locations.take(5).toList(); // أخذ أول 5 نتائج فقط
-        _isSearching = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isSearching = false;
-        _searchResults.clear();
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'لم يتم العثور على نتائج للبحث: $query',
-            style: const TextStyle(fontFamily: 'Cairo'),
-          ),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  // اختيار موقع من نتائج البحث
-  void _selectSearchResult(Location location, String query) {
-    final LatLng position = LatLng(location.latitude, location.longitude);
-    
-    setState(() {
-      _selectedPosition = position;
-      _selectedLocationName = query;
-      _searchResults.clear();
-      _searchController.clear();
-      
-      _markers.clear();
-      _markers.add(
-        Marker(
-          markerId: const MarkerId('selected'),
-          position: position,
-          draggable: true,
-          onDragEnd: (LatLng newPosition) {
-            setState(() {
-              _selectedPosition = newPosition;
-              _selectedLocationName = null;
-            });
-          },
-        ),
-      );
-    });
-
-    // تحريك الكاميرا للموقع الجديد
-    _mapController?.animateCamera(
-      CameraUpdate.newCameraPosition(
-        CameraPosition(
-          target: position,
-          zoom: 16,
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Dialog(
-        insetPadding: const EdgeInsets.all(16),
-        child: Container(
-          height: MediaQuery.of(context).size.height * 0.8,
-          child: Stack(
-            children: [
-              // الطبقة الخلفية - Column الأصلي بدون نتائج البحث
-              Column(
-                children: [
-                  // رأس الحوار
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFFC8700),
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(12),
-                        topRight: Radius.circular(12),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.map, color: Colors.white),
-                        const SizedBox(width: 8),
-                        const Expanded(
-                          child: Text(
-                            'اختر الموقع من الخريطة',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'Cairo',
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white),
-                          onPressed: () => Navigator.of(context).pop(),
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  // شريط البحث
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _searchController,
-                            decoration: InputDecoration(
-                              hintText: 'ابحث عن عنوان أو منطقة...',
-                              hintStyle: const TextStyle(
-                                fontFamily: 'Cairo',
-                                color: Colors.grey,
-                              ),
-                              prefixIcon: _isSearching
-                                  ? const Padding(
-                                      padding: EdgeInsets.all(12),
-                                      child: SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFC8700)),
-                                        ),
-                                      ),
-                                    )
-                                  : const Icon(Icons.search, color: Color(0xFFFC8700)),
-                              suffixIcon: _searchController.text.isNotEmpty
-                                  ? IconButton(
-                                      icon: const Icon(Icons.clear, color: Colors.grey),
-                                      onPressed: () {
-                                        _searchController.clear();
-                                        setState(() {
-                                          _searchResults.clear();
-                                        });
-                                      },
-                                    )
-                                  : null,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: Colors.grey[300]!),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: Color(0xFFFC8700), width: 2),
-                              ),
-                              filled: true,
-                              fillColor: Colors.grey[50],
-                            ),
-                            style: const TextStyle(fontFamily: 'Cairo'),
-                            onChanged: (value) {
-                              setState(() {});
-                              if (value.isEmpty) {
-                                setState(() {
-                                  _searchResults.clear();
-                                });
-                              }
-                            },
-                            onSubmitted: (value) {
-                              if (value.trim().isNotEmpty) {
-                                _searchLocation(value);
-                              }
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          onPressed: () {
-                            if (_searchController.text.trim().isNotEmpty) {
-                              _searchLocation(_searchController.text.trim());
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFC8700),
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text(
-                            'بحث',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'Cairo',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  // الخريطة
-                  Expanded(
-                    child: GoogleMap(
-                      initialCameraPosition: CameraPosition(
-                        target: widget.initialPosition,
-                        zoom: 15,
-                      ),
-                      markers: _markers,
-                      onMapCreated: (GoogleMapController controller) {
-                        _mapController = controller;
-                      },
-                      onTap: (LatLng position) {
-                        setState(() {
-                            _selectedPosition = position;
-                            _selectedLocationName = null; // مسح اسم الموقع عند النقر على الخريطة
-                            _markers.clear();
-                            _markers.add(
-                              Marker(
-                                markerId: const MarkerId('selected'),
-                                position: position,
-                                draggable: true,
-                                onDragEnd: (LatLng newPosition) {
-                                  setState(() {
-                                    _selectedPosition = newPosition;
-                                    _selectedLocationName = null;
-                                  });
-                                },
-                              ),
-                            );
-                          });
-                      },
-                      myLocationEnabled: true,
-                      myLocationButtonEnabled: true,
-                      zoomControlsEnabled: true,
-                      mapToolbarEnabled: false,
-                    ),
-                  ),
-                  
-                  // معلومات الموقع المحدد
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[50],
-                      border: Border(
-                        top: BorderSide(color: Colors.grey[300]!),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.location_on,
-                              color: Color(0xFFFC8700),
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'الموقع المحدد:',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                fontFamily: 'Cairo',
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        
-                        // إظهار اسم الموقع إذا تم اختياره من البحث
-                        if (_selectedLocationName != null) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFC8700).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: const Color(0xFFFC8700).withOpacity(0.3),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.search,
-                                  color: Color(0xFFFC8700),
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _selectedLocationName!,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFFFC8700),
-                                      fontFamily: 'Cairo',
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                        ],
-                        
-                        // الإحداثيات
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.grey[300]!),
-                          ),
-                          child: Column(
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.my_location,
-                                    color: Colors.grey,
-                                    size: 16,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'خط العرض: ${_selectedPosition?.latitude.toStringAsFixed(6)}',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.grey,
-                                      fontFamily: 'Cairo',
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.my_location,
-                                    color: Colors.grey,
-                                    size: 16,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'خط الطول: ${_selectedPosition?.longitude.toStringAsFixed(6)}',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.grey,
-                                      fontFamily: 'Cairo',
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  // أزرار التحكم
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                side: const BorderSide(color: Color(0xFFFC8700)),
-                              ),
-                            ),
-                            child: const Text(
-                              'إلغاء',
-                              style: TextStyle(
-                                color: Color(0xFFFC8700),
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'Cairo',
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              Navigator.of(context).pop(_selectedPosition);
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFFC8700),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: const Text(
-                              'تأكيد الاختيار',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'Cairo',
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              
-              // الطبقة العائمة - نتائج البحث
-              if (_searchResults.isNotEmpty)
-                Positioned(
-                  top: 140.0, // المسافة من الحافة العلوية للـ Stack
-                  right: 16.0, // الهامش الأيمن
-                  left: 16.0, // الهامش الأيسر
-                  child: Container(
-                    constraints: const BoxConstraints(
-                      maxHeight: 200, // حد أقصى لارتفاع قائمة النتائج
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey[300]!),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      itemCount: _searchResults.length,
-                      separatorBuilder: (context, index) => Divider(
-                        height: 1,
-                        color: Colors.grey[200],
-                      ),
-                      itemBuilder: (context, index) {
-                        final location = _searchResults[index];
-                        return ListTile(
-                          dense: true,
-                          leading: const Icon(
-                            Icons.location_on,
-                            color: Color(0xFFFC8700),
-                            size: 20,
-                          ),
-                          title: Text(
-                            _searchController.text,
-                            style: const TextStyle(
-                              fontFamily: 'Cairo',
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          subtitle: Text(
-                            '${location.latitude.toStringAsFixed(4)}, ${location.longitude.toStringAsFixed(4)}',
-                            style: const TextStyle(
-                              fontFamily: 'Cairo',
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
-                          ),
-                          onTap: () {
-                            _selectSearchResult(location, _searchController.text);
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // بناء قسم تفاصيل المسار والسعر المحسوب
-  Widget _buildRouteDetailsSection() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFC8700), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.route,
-                color: Color(0xFFFC8700),
-                size: 24,
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'تفاصيل المسار',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF333333),
-                  fontFamily: 'Cairo',
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 }
