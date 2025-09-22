@@ -565,7 +565,7 @@ class _OffersScreenState extends State<OffersScreen>
             onRefresh: _refreshData,
             color: const Color(0xFFFC8700),
             child: offersProvider.offers.isEmpty
-                ? _buildNoOffersView()
+                ? _buildNoOffersView(offersProvider)
                 : Column(
                     children: [
                       if (offersProvider.isLoading)
@@ -636,7 +636,14 @@ class _OffersScreenState extends State<OffersScreen>
     );
   }
 
-  Widget _buildNoOffersView() {
+  Widget _buildNoOffersView(OffersProvider offersProvider) {
+    // استخدام رسالة الخادم إذا كانت متوفرة، وإلا استخدام الرسالة الافتراضية
+    final serverMessage = offersProvider.lastMessage;
+    final displayMessage = serverMessage ?? 'لا توجد عروض متاحة حالياً';
+    final subMessage = serverMessage != null 
+        ? 'سيتم إشعارك عند توفر عروض جديدة'
+        : 'جاري البحث عن سائقين متاحين...';
+    
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -648,22 +655,24 @@ class _OffersScreenState extends State<OffersScreen>
           ),
           const SizedBox(height: 16),
           Text(
-            'لا توجد عروض متاحة حالياً',
+            displayMessage,
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
               color: Colors.grey[600],
               fontFamily: 'Cairo',
             ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
-            'جاري البحث عن سائقين متاحين...',
+            subMessage,
             style: TextStyle(
               fontSize: 14,
               color: Colors.grey[500],
               fontFamily: 'Cairo',
             ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
           Container(

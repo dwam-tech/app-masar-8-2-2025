@@ -18,6 +18,7 @@ class OffersProvider with ChangeNotifier {
   bool _isLoading = false;
   bool _isRefreshing = false;
   String? _error;
+  String? _lastMessage;
   Timer? _autoRefreshTimer;
   
   // Real-time subscriptions
@@ -32,6 +33,7 @@ class OffersProvider with ChangeNotifier {
   bool get isRefreshing => _isRefreshing;
   String? get error => _error;
   String? get errorMessage => _error;
+  String? get lastMessage => _lastMessage;
   bool get hasData => _deliveryRequest != null;
   bool get hasOffers => _offers.isNotEmpty;
   bool get isRequestAccepted => _deliveryRequest?.status == 'accepted_waiting_driver' || 
@@ -321,6 +323,7 @@ class OffersProvider with ChangeNotifier {
   
   void _clearError() {
     _error = null;
+    _lastMessage = null;
   }
   
   // Clear all data
@@ -330,6 +333,7 @@ class OffersProvider with ChangeNotifier {
     _isLoading = false;
     _isRefreshing = false;
     _error = null;
+    _lastMessage = null;
     _stopAutoRefresh();
     _stopRealtimeMonitoring();
     notifyListeners();
