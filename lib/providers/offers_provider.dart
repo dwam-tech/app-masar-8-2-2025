@@ -112,8 +112,14 @@ class OffersProvider with ChangeNotifier {
       if (result['success']) {
         _deliveryRequest = result['deliveryRequest'];
         _offers = result['offers'] ?? [];
+        
+        // تحديث lastMessage من الخادم
+        if (result['message'] != null) {
+          _lastMessage = result['message'];
+        }
       } else {
         _setError(result['message'] ?? 'حدث خطأ في تحديث البيانات');
+        _lastMessage = result['message'];
       }
     } catch (e) {
       _setError('حدث خطأ في الاتصال بالخادم');

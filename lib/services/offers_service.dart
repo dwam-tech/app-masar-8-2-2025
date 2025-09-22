@@ -131,7 +131,7 @@ class OffersService {
       }
 
       final response = await http.get(
-        Uri.parse('$baseUrl/delivery/requests/$requestId'),
+        Uri.parse('$baseUrl/delivery/requests/$requestId/offers'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -141,11 +141,24 @@ class OffersService {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        return {
-          'success': true,
-          'deliveryRequest': DeliveryRequestModel.fromJson(data['data']),
-          'message': 'تم تحديث حالة الطلب بنجاح',
-        };
+        
+        if (data['status'] == true) {
+          final requestData = data['data']['delivery_request'];
+          final offersData = data['data']['offers'] ?? [];
+          final lastMessage = data['lastMessage'];
+          
+          return {
+            'success': true,
+            'deliveryRequest': DeliveryRequestModel.fromJson(requestData),
+            'offers': offersData.map<OfferModel>((offer) => OfferModel.fromJson(offer)).toList(),
+            'message': lastMessage ?? data['message'] ?? 'تم تحديث البيانات بنجاح',
+          };
+        } else {
+          return {
+            'success': false,
+            'message': data['message'] ?? 'حدث خطأ في جلب البيانات',
+          };
+        }
       } else {
         final errorData = json.decode(response.body);
         throw Exception(errorData['message'] ?? 'حدث خطأ أثناء تحديث حالة الطلب');
