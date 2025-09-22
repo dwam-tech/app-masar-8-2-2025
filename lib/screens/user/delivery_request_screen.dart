@@ -834,28 +834,20 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
             actions: [
               TextButton(
                 onPressed: () {
-                  // أغلق الحوار أولاً باستخدام سياق الحوار، ثم استخدم سياق الصفحة الأصلية للتوجيه
-                  final dialogContext = context;
-                  Navigator.of(dialogContext, rootNavigator: true).pop();
-                  final parentContext = this.context;
-                  Future.microtask(() {
-                    if (requestId != null && requestId.toString().isNotEmpty) {
-                      // التنقل مباشرة إلى صفحة العروض مع تمرير البيانات المطلوبة
-                      Navigator.of(parentContext).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (context) => OffersScreen(
-                            deliveryRequestId: int.parse(requestId.toString()),
-                            fromLocation: _fromLocationController.text,
-                            toLocation: _toLocationController.text,
-                            requestedPrice: _estimatedPrice ?? 0.0,
-                            estimatedDurationMinutes: _estimatedDurationMinutes ?? 0,
-                          ),
-                        ),
-                      );
-                    } else {
-                      GoRouter.of(parentContext).go('/UserHomeScreen');
-                    }
-                  });
+                  // أغلق الحوار أولاً
+                  Navigator.of(context).pop();
+                  
+                  // التنقل باستخدام GoRouter
+                   if (requestId != null && requestId.toString().isNotEmpty) {
+                     GoRouter.of(this.context).go('/offers/${requestId.toString()}', extra: {
+                       'fromLocation': _fromLocationController.text,
+                       'toLocation': _toLocationController.text,
+                       'requestedPrice': _estimatedPrice ?? 0.0,
+                       'estimatedDurationMinutes': _estimatedDurationMinutes ?? 0,
+                     });
+                   } else {
+                     GoRouter.of(this.context).go('/UserHomeScreen');
+                   }
                 },
                 child: const Text(
                   'موافق',

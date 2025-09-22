@@ -2,13 +2,145 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/driver_model.dart';
 import '../models/delivery_offer_model.dart';
+import '../models/delivery_request_model.dart';
 import '../utils/constants.dart';
 import '../utils/auth_helper.dart';
 
 class DriverService {
+  final String token;
   static const String baseUrl = '${Constants.baseUrl}/api';
+  
+  DriverService({required this.token});
 
-  // الحصول على قائمة السائقين المتاحين
+  Map<String, String> get _headers => {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'Authorization': 'Bearer $token',
+  };
+
+  /// جلب جميع طلبات التوصيل المتاحة للسائق
+  Future<List<DeliveryRequestModel>> fetchAvailableRequests() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/driver/available-requests'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true && data['data'] != null) {
+          final List<dynamic> requestsJson = data['data'];
+          return requestsJson
+              .map((json) => DeliveryRequestModel.fromJson(json))
+              .toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      print('خطأ في جلب الطلبات المتاحة: $e');
+      return [];
+    }
+  }
+
+  /// جلب العروض المقدمة من السائق
+  Future<List<DeliveryRequestModel>> fetchMyOffers() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/driver/my-offers'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true && data['data'] != null) {
+          final List<dynamic> requestsJson = data['data'];
+          return requestsJson
+              .map((json) => DeliveryRequestModel.fromJson(json))
+              .toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      print('خطأ في جلب عروضي: $e');
+      return [];
+    }
+  }
+
+  /// جلب الطلبات المنتهية للسائق
+  Future<List<DeliveryRequestModel>> fetchCompletedRequests() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/driver/completed-requests'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true && data['data'] != null) {
+          final List<dynamic> requestsJson = data['data'];
+          return requestsJson
+              .map((json) => DeliveryRequestModel.fromJson(json))
+              .toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      print('خطأ في جلب الطلبات المنتهية: $e');
+      return [];
+    }
+  }
+
+  /// تقديم عرض على طلب توصيل
+  Future<bool> submitOffer({
+    required int requestId,
+    required double offeredPrice,
+    String? notes,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/driver/submit-offer'),
+        headers: _headers,
+        body: json.encode({
+          'delivery_request_id': requestId,
+          'offered_price': offeredPrice,
+          'notes': notes,
+        }),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = json.decode(response.body);
+        return data['success'] == true;
+      }
+      return false;
+    } catch (e) {
+      print('خطأ في تقديم العرض: $e');
+      return false;
+    }
+  }
+
+  /// تحديث حالة توفر السائق
+  Future<bool> updateAvailability({required bool isAvailable}) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/driver/update-availability'),
+        headers: _headers,
+        body: json.encode({
+          'is_available': isAvailable,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['success'] == true;
+      }
+      return false;
+    } catch (e) {
+      print('خطأ في تحديث حالة التوفر: $e');
+      return false;
+    }
+  }
+
+  // الحصول على قائمة السائقين المتاحين (الوظيفة الأصلية)
   static Future<List<Driver>> getAvailableDrivers({
     double? latitude,
     double? longitude,

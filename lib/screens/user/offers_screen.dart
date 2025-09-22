@@ -210,6 +210,7 @@ class _OffersScreenState extends State<OffersScreen>
           context,
           'تم قبول العرض بنجاح - سيتم التواصل معك قريباً من قبل مقدم الخدمة',
         );
+        
       } else {
         final errorMessage = _offersProvider.errorMessage ?? 'فشل في قبول العرض';
         _errorHandler.showError(context, Exception(errorMessage), showDialog: true);

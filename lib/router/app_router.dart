@@ -92,6 +92,7 @@ import 'package:saba2v2/screens/user/my_orders_screen.dart';
 import 'package:saba2v2/screens/user/favorites_screen.dart';
 import 'package:saba2v2/screens/driver/driver_requests_screen.dart';
 import 'package:saba2v2/screens/driver/submit_offer_screen.dart';
+import 'package:saba2v2/screens/driver/driver_home_screen.dart';
 import 'package:saba2v2/screens/user/offers_screen.dart';
 import 'package:saba2v2/models/offer_model.dart';
 import 'package:saba2v2/models/delivery_request_model.dart';
@@ -106,8 +107,30 @@ class AppRouter {
       // ربط navigatorKey لضمان إمكانية الوصول إلى BuildContext عبر NavigationService
       navigatorKey: NavigationService.navigatorKey,
       redirect: (BuildContext context, GoRouterState state) {
-        // تعطيل التوجيه بناءً على حالة المصادقة للسماح بالوصول لجميع الصفحات
-        return null; // السماح بالوصول لجميع المسارات دون قيود
+        // التحقق من نوع المستخدم وتوجيهه للصفحة المناسبة
+        if (authProvider.isAuthenticated) {
+          final userType = authProvider.userType;
+          
+          // توجيه السائقين للصفحة المخصصة لهم
+          if (userType == 'delivery_person' || userType == 'driver') {
+            if (state.uri.toString() == '/SplashScreen' || state.uri.toString() == '/login') {
+              return '/driver-home';
+            }
+          }
+          // توجيه مالكي السيارات لصفحة التأجير
+          else if (userType == 'car_rental_owner') {
+            if (state.uri.toString() == '/SplashScreen' || state.uri.toString() == '/login') {
+              return '/delivery-homescreen';
+            }
+          }
+          // توجيه المستخدمين العاديين للصفحة الرئيسية
+          else if (userType == 'user') {
+            if (state.uri.toString() == '/SplashScreen' || state.uri.toString() == '/login') {
+              return '/UserHomeScreen';
+            }
+          }
+        }
+        return null; // السماح بالوصول لجميع المسارات الأخرى
       },
       routes: [
         // الشاشات العامة
@@ -493,6 +516,11 @@ class AppRouter {
           },
         ),
         // شاشات السائق
+        GoRoute(
+          path: '/driver-home',
+          name: 'driverHome',
+          builder: (context, state) => const DriverHomeScreen(),
+        ),
         GoRoute(
           path: '/driver-requests',
           name: 'driverRequests',

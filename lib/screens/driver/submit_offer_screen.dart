@@ -370,14 +370,100 @@ class _SubmitOfferScreenState extends State<SubmitOfferScreen> {
             ),
             const SizedBox(height: 16),
             
-            // حقل السعر
+            // مقارنة السعر
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue[200]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'مقارنة الأسعار',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'السعر المطلوب من العميل',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          Text(
+                            '${widget.deliveryRequest.requestedPrice.toStringAsFixed(0)} جنيه',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.green[100],
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          'يمكنك اقتراح سعر مختلف',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.green,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            // حقل السعر المحدث
             TextFormField(
               controller: _priceController,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
-                labelText: 'السعر المعروض (د.ع)',
+                labelText: 'السعر المعروض (جنيه)',
                 hintText: 'أدخل السعر الذي تريد عرضه',
-                prefixIcon: const Icon(Icons.attach_money),
+                prefixIcon: const Icon(Icons.attach_money, color: Color(0xFF2E7D32)),
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.remove, color: Colors.red),
+                      onPressed: () {
+                        double currentPrice = double.tryParse(_priceController.text) ?? 0;
+                        if (currentPrice > 10) {
+                          _priceController.text = (currentPrice - 10).toStringAsFixed(0);
+                        }
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.add, color: Colors.green),
+                      onPressed: () {
+                        double currentPrice = double.tryParse(_priceController.text) ?? 0;
+                        _priceController.text = (currentPrice + 10).toStringAsFixed(0);
+                      },
+                    ),
+                  ],
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -385,7 +471,12 @@ class _SubmitOfferScreenState extends State<SubmitOfferScreen> {
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
                 ),
+                filled: true,
+                fillColor: Colors.grey[50],
               ),
+              onChanged: (value) {
+                setState(() {}); // لتحديث مؤشر الفرق في السعر
+              },
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
                   return 'يرجى إدخال السعر';
@@ -394,9 +485,44 @@ class _SubmitOfferScreenState extends State<SubmitOfferScreen> {
                 if (price == null || price <= 0) {
                   return 'يرجى إدخال سعر صحيح';
                 }
+                if (price > widget.deliveryRequest.requestedPrice * 2) {
+                  return 'السعر مرتفع جداً مقارنة بالسعر المطلوب';
+                }
                 return null;
               },
             ),
+            const SizedBox(height: 12),
+            
+            // مؤشر الفرق في السعر
+            if (_priceController.text.isNotEmpty && double.tryParse(_priceController.text) != null)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _getPriceDifferenceColor().withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: _getPriceDifferenceColor().withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _getPriceDifferenceIcon(),
+                      color: _getPriceDifferenceColor(),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _getPriceDifferenceText(),
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: _getPriceDifferenceColor(),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             const SizedBox(height: 16),
             
             // مقارنة السعر
@@ -445,44 +571,112 @@ class _SubmitOfferScreenState extends State<SubmitOfferScreen> {
             ),
             const SizedBox(height: 16),
             
-            // نصائح للسائق
+            // نصائح للسائق المحدثة
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.green[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green[200]!),
+                gradient: LinearGradient(
+                  colors: [Colors.green[50]!, Colors.green[100]!],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.green[300]!),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Row(
                     children: [
-                      Icon(Icons.lightbulb, color: Colors.green, size: 20),
-                      SizedBox(width: 8),
+                      Icon(Icons.lightbulb, color: Colors.green, size: 24),
+                      SizedBox(width: 12),
                       Text(
-                        'نصائح لتقديم عرض ناجح:',
+                        'نصائح لتقديم عرض ناجح',
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 16,
                           color: Colors.green,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    '• قدم سعراً منافساً ومعقولاً\n• أضف ملاحظات توضح خبرتك أو خدمات إضافية\n• كن مهذباً ومهنياً في التعامل',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.green,
-                    ),
-                  ),
+                  const SizedBox(height: 12),
+                  _buildTipItem('💰', 'قدم سعراً منافساً ومعقولاً'),
+                  _buildTipItem('📝', 'أضف ملاحظات توضح خبرتك أو خدمات إضافية'),
+                  _buildTipItem('🤝', 'كن مهذباً ومهنياً في التعامل'),
+                  _buildTipItem('⚡', 'الاستجابة السريعة تزيد من فرص القبول'),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // دوال مساعدة لحساب الفرق في السعر
+  Color _getPriceDifferenceColor() {
+    final offeredPrice = double.tryParse(_priceController.text) ?? 0;
+    final requestedPrice = widget.deliveryRequest.requestedPrice;
+    
+    if (offeredPrice == requestedPrice) {
+      return Colors.green;
+    } else if (offeredPrice < requestedPrice) {
+      return Colors.blue;
+    } else {
+      return Colors.orange;
+    }
+  }
+  
+  IconData _getPriceDifferenceIcon() {
+    final offeredPrice = double.tryParse(_priceController.text) ?? 0;
+    final requestedPrice = widget.deliveryRequest.requestedPrice;
+    
+    if (offeredPrice == requestedPrice) {
+      return Icons.check_circle;
+    } else if (offeredPrice < requestedPrice) {
+      return Icons.trending_down;
+    } else {
+      return Icons.trending_up;
+    }
+  }
+  
+  String _getPriceDifferenceText() {
+    final offeredPrice = double.tryParse(_priceController.text) ?? 0;
+    final requestedPrice = widget.deliveryRequest.requestedPrice;
+    final difference = (offeredPrice - requestedPrice).abs();
+    
+    if (offeredPrice == requestedPrice) {
+      return 'السعر مطابق للسعر المطلوب - ممتاز!';
+    } else if (offeredPrice < requestedPrice) {
+      return 'سعرك أقل بـ ${difference.toStringAsFixed(0)} جنيه - عرض جذاب للعميل';
+    } else {
+      return 'سعرك أعلى بـ ${difference.toStringAsFixed(0)} جنيه - تأكد من المبرر';
+    }
+  }
+  
+  Widget _buildTipItem(String emoji, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            emoji,
+            style: const TextStyle(fontSize: 16),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.green,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
