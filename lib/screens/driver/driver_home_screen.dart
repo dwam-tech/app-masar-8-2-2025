@@ -67,10 +67,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       _userType = userMap['user_type'];
 
       if (_userType == 'driver') {
-        final driverDetail = userMap['driver_detail'];
-        if (driverDetail != null) {
-          isAvailableForDelivery = (driverDetail['is_available'] == true || driverDetail['is_available'] == 1);
-        }
+        // Initialize availability from user data
+        isAvailableForDelivery = (userMap['is_available'] == true || userMap['is_available'] == 1);
       }
       
       await _driverProvider?.fetchAllRequests();
