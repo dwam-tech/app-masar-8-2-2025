@@ -61,11 +61,18 @@ class OffersProvider with ChangeNotifier {
         shouldRetry: (error) => error is! FormatException,
       );
       
-      if (result != null && result['success']) {
-        _deliveryRequest = result['deliveryRequest'];
-        _offers = result['offers'] ?? [];
-        _startAutoRefresh(requestId);
-        _startRealtimeMonitoring(requestId);
+      if (result != null && result['status'] == true) {
+        final data = result['data'];
+        if (data != null) {
+          _deliveryRequest = data['delivery_request'];
+          _offers = List<OfferModel>.from(
+            (data['offers'] ?? []).map((offer) => OfferModel.fromJson(offer))
+          );
+          _startAutoRefresh(requestId);
+          _startRealtimeMonitoring(requestId);
+        } else {
+          _setError('لا توجد بيانات متاحة للطلب');
+        }
       } else {
         _setError(result?['message'] ?? 'حدث خطأ في تحميل البيانات');
       }

@@ -19,7 +19,7 @@ class OffersService {
       }
 
       final response = await http.get(
-        Uri.parse('$baseUrl/delivery/requests/$requestId/offers'),
+        Uri.parse('$baseUrl/delivery/requests/$requestId/with-offers'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -30,11 +30,13 @@ class OffersService {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         return {
-          'success': true,
-          'deliveryRequest': DeliveryRequestModel.fromJson(data['data']['delivery_request']),
-          'offers': (data['data']['offers'] as List)
-              .map((offer) => OfferModel.fromJson(offer))
-              .toList(),
+          'status': true,
+          'data': {
+            'delivery_request': DeliveryRequestModel.fromJson(data['data']['delivery_request']),
+            'offers': (data['data']['offers'] as List)
+                .map((offer) => OfferModel.fromJson(offer))
+                .toList(),
+          },
           'message': data['message'] ?? 'تم جلب البيانات بنجاح',
         };
       } else if (response.statusCode == 401) {
@@ -42,16 +44,28 @@ class OffersService {
       } else if (response.statusCode == 403) {
         throw Exception('ليس لديك صلاحية للوصول إلى هذا الطلب');
       } else if (response.statusCode == 404) {
-        throw Exception('لم يتم العثور على الطلب المحدد');
+        return {
+          'status': false,
+          'message': 'لم يتم العثور على الطلب المحدد. قد يكون الطلب قد تم حذفه أو انتهت صلاحيته.',
+        };
       } else {
         final errorData = json.decode(response.body);
-        throw Exception(errorData['message'] ?? 'حدث خطأ أثناء جلب البيانات');
+        return {
+          'status': false,
+          'message': errorData['message'] ?? 'حدث خطأ في الخادم',
+        };
       }
     } catch (e) {
       if (e.toString().contains('SocketException') || e.toString().contains('TimeoutException')) {
-        throw Exception('تحقق من اتصالك بالإنترنت وحاول مرة أخرى');
+        return {
+          'status': false,
+          'message': 'تحقق من اتصالك بالإنترنت وحاول مرة أخرى',
+        };
       }
-      rethrow;
+      return {
+        'status': false,
+        'message': 'حدث خطأ أثناء جلب البيانات: ${e.toString()}',
+      };
     }
   }
 

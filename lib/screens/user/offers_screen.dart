@@ -136,6 +136,13 @@ class _OffersScreenState extends State<OffersScreen>
     }
     
     await _offersProvider.loadDeliveryRequestWithOffers(widget.deliveryRequestId.toString());
+    
+    // معالجة الأخطاء
+    if (_offersProvider.errorMessage != null && mounted) {
+      _errorHandler.showError(context, Exception(_offersProvider.errorMessage!), showDialog: true);
+      return;
+    }
+    
     if (_offersProvider.deliveryRequest != null) {
       _animationController.forward();
     }
