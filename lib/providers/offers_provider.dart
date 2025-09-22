@@ -68,6 +68,14 @@ class OffersProvider with ChangeNotifier {
           _offers = List<OfferModel>.from(
             (data['offers'] ?? []).map((offer) => OfferModel.fromJson(offer))
           );
+          
+          // إذا لم تكن هناك عروض، لا نعتبر هذا خطأ
+          // بل نعرض الرسالة التوضيحية من الخادم
+          if (_offers.isEmpty && result['message'] != null) {
+            // نحفظ الرسالة التوضيحية بدلاً من رسالة خطأ
+            _lastMessage = result['message'];
+          }
+          
           _startAutoRefresh(requestId);
           _startRealtimeMonitoring(requestId);
         } else {
