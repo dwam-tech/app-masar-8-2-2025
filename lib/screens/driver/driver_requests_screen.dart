@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
@@ -7,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/laravel_service.dart';
 import '../../models/offer_model.dart';
 import '../../models/delivery_request_model.dart';
+import '../../providers/driver_state.dart';
 import 'submit_offer_screen.dart';
 
 const String baseUrl = 'https://msar.app';
@@ -20,8 +22,6 @@ class DriverRequestsScreen extends StatefulWidget {
 
 class _DriverRequestsScreenState extends State<DriverRequestsScreen>
     with TickerProviderStateMixin {
-  List<DeliveryRequestModel> _availableRequests = [];
-  bool _isLoading = true;
   Timer? _refreshTimer;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -37,8 +37,12 @@ class _DriverRequestsScreenState extends State<DriverRequestsScreen>
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
-    _loadAvailableRequests();
-    _startAutoRefresh();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final driverProvider = Provider.of<DriverState>(context, listen: false);
+      driverProvider.fetchAllRequests();
+      driverProvider.startAutoRefresh();
+    });
+    _animationController.forward();
   }
 
   @override
@@ -48,62 +52,7 @@ class _DriverRequestsScreenState extends State<DriverRequestsScreen>
     super.dispose();
   }
 
-  void _startAutoRefresh() {
-    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
-      _loadAvailableRequests();
-    });
-  }
 
-  Future<void> _loadAvailableRequests() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token');
-      
-      if (token == null) {
-        context.go('/login');
-        return;
-      }
-
-      final url = Uri.parse('${baseUrl}/available-requests');
-      final queryParams = <String, String>{};
-      
-      if (_selectedTripType != null) {
-        queryParams['trip_type'] = _selectedTripType!;
-      }
-      
-      final finalUrl = url.replace(queryParameters: queryParams);
-      
-      final response = await http.get(
-        finalUrl,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['status'] == true) {
-          final requestsData = data['available_requests']['data'] as List;
-          setState(() {
-            _availableRequests = requestsData
-                .map((json) => DeliveryRequestModel.fromJson(json))
-                .toList();
-            _isLoading = false;
-          });
-          _animationController.forward();
-        }
-      } else if (response.statusCode == 401) {
-        context.go('/login');
-      }
-    } catch (e) {
-      print('Error loading available requests: $e');
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -121,11 +70,40 @@ class _DriverRequestsScreenState extends State<DriverRequestsScreen>
         children: [
           _buildFilterSection(),
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _availableRequests.isEmpty
-                    ? _buildEmptyState()
-                    : _buildRequestsList(),
+            child: Consumer<DriverState>(
+              builder: (context, provider, child) {
+                if (provider.isLoading) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                
+                if (provider.error != null) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text('خطأ: ${provider.error}'),
+                        ElevatedButton(
+                          onPressed: () => provider.fetchAllRequests(),
+                          child: const Text('إعادة المحاولة'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                
+                final requests = provider.availableRequests;
+                if (requests.isEmpty) {
+                  return _buildEmptyState();
+                }
+                
+                return RefreshIndicator(
+                  onRefresh: () async {
+                    await provider.fetchAllRequests();
+                  },
+                  child: _buildRequestsList(requests),
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -173,9 +151,9 @@ class _DriverRequestsScreenState extends State<DriverRequestsScreen>
             onChanged: (value) {
               setState(() {
                 _selectedTripType = value;
-                _isLoading = true;
               });
-              _loadAvailableRequests();
+              final driverProvider = Provider.of<DriverState>(context, listen: false);
+              driverProvider.fetchAllRequests();
             },
           ),
         ],
@@ -216,19 +194,16 @@ class _DriverRequestsScreenState extends State<DriverRequestsScreen>
     );
   }
 
-  Widget _buildRequestsList() {
+  Widget _buildRequestsList(List<DeliveryRequestModel> requests) {
     return FadeTransition(
       opacity: _fadeAnimation,
-      child: RefreshIndicator(
-        onRefresh: _loadAvailableRequests,
-        child: ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: _availableRequests.length,
-          itemBuilder: (context, index) {
-            final request = _availableRequests[index];
-            return _buildRequestCard(request);
-          },
-        ),
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: requests.length,
+        itemBuilder: (context, index) {
+          final request = requests[index];
+          return _buildRequestCard(request);
+        },
       ),
     );
   }
@@ -654,7 +629,10 @@ class _DriverRequestsScreenState extends State<DriverRequestsScreen>
       ),
     ).then((_) {
       // تحديث القائمة بعد العودة من شاشة تقديم العرض
-      _loadAvailableRequests();
+      if (mounted) {
+        final driverProvider = Provider.of<DriverState>(context, listen: false);
+        driverProvider.fetchAllRequests();
+      }
     });
   }
 }

@@ -21,7 +21,6 @@ class DriverHomeScreen extends StatefulWidget {
 class _DriverHomeScreenState extends State<DriverHomeScreen> {
   // خدمات وبيانات
   DriverService? _driverService;
-  DriverState? _driverProvider;
   String? _userType;
 
   // متغير حالة لتتبع الطلب الذي يتم التفاعل معه
@@ -46,7 +45,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   
   @override
   void dispose() {
-    _driverProvider?.dispose();
     super.dispose();
   }
 
@@ -61,7 +59,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       }
 
       _driverService = DriverService(token: token);
-      _driverProvider = DriverState(service: _driverService!);
       
       final userMap = jsonDecode(userJsonString);
       _userType = userMap['user_type'];
@@ -71,8 +68,12 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         isAvailableForDelivery = (userMap['is_available'] == true || userMap['is_available'] == 1);
       }
       
-      await _driverProvider?.fetchAllRequests();
-      _driverProvider?.startAutoRefresh();
+      // Use Provider to fetch requests
+      if (mounted) {
+        final driverProvider = Provider.of<DriverState>(context, listen: false);
+        await driverProvider.fetchAllRequests();
+        driverProvider.startAutoRefresh();
+      }
 
     } catch (e) {
       if (mounted) {
@@ -90,8 +91,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }
 
   Future<void> _submitOffer(DeliveryRequestModel request) async {
-    if (_driverProvider == null) return;
-    
     // التنقل إلى صفحة تقديم العرض
     final result = await Navigator.push(
       context,
@@ -101,8 +100,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     );
     
     // إذا تم تقديم العرض بنجاح، قم بتحديث القائمة
-    if (result == true) {
-      await _driverProvider?.fetchAllRequests();
+    if (result == true && mounted) {
+      final driverProvider = Provider.of<DriverState>(context, listen: false);
+      await driverProvider.fetchAllRequests();
     }
   }
 
@@ -111,7 +111,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final isTablet = MediaQuery.of(context).size.width > 600;
     final screenWidth = MediaQuery.of(context).size.width;
 
-    if (_driverProvider == null || isLoadingPage) {
+    if (isLoadingPage) {
       return const Directionality(
         textDirection: TextDirection.rtl,
         child: Scaffold(
@@ -120,9 +120,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       );
     }
 
-    return ChangeNotifierProvider.value(
-      value: _driverProvider!,
-      child: Directionality(
+    return Directionality(
         textDirection: TextDirection.rtl,
         child: Scaffold(
           backgroundColor: const Color(0xFFF8F9FA),
@@ -142,7 +140,12 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                       if (provider.error != null && provider.allRequests.isEmpty) {
                         return Center(child: Text("خطأ: ${provider.error}"));
                       }
-                      return _buildRequestsList(isTablet, screenWidth);
+                      return RefreshIndicator(
+                        onRefresh: () async {
+                          await provider.fetchAllRequests();
+                        },
+                        child: _buildRequestsList(isTablet, screenWidth),
+                      );
                     },
                   ),
                 ),
@@ -151,8 +154,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           ),
           bottomNavigationBar: _buildBottomNavigationBar(context, isTablet),
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildAppBar(BuildContext context, bool isTablet) {
@@ -315,7 +317,12 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         }
 
         if (currentList.isEmpty) {
-          return Center(child: Text("لا توجد طلبات في قسم '$emptyMessage' حاليًا", style: const TextStyle(fontSize: 16, color: Colors.grey)));
+          return ListView(
+            children: [
+              const SizedBox(height: 100),
+              Center(child: Text("لا توجد طلبات في قسم '$emptyMessage' حاليًا", style: const TextStyle(fontSize: 16, color: Colors.grey))),
+            ],
+          );
         }
 
         return ListView.builder(

@@ -23,6 +23,9 @@ import 'package:saba2v2/providers/banner_provider.dart';
 import 'package:saba2v2/providers/flight_search_provider.dart';
 import 'package:saba2v2/providers/hotel_search_provider.dart';
 import 'package:saba2v2/providers/notification_provider.dart';
+import 'package:saba2v2/providers/offers_provider.dart';
+import 'package:saba2v2/providers/driver_state.dart';
+import 'package:saba2v2/services/driver_service.dart';
 import 'package:go_router/go_router.dart';
 
 // إضافة NavigationService للوصول إلى السياق خارجツツツ
@@ -217,6 +220,16 @@ void main() async {
         ChangeNotifierProvider(create: (_) => FlightSearchProvider()),
         ChangeNotifierProvider(create: (_) => HotelSearchProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
+        ChangeNotifierProvider(create: (_) => OffersProvider()),
+        ChangeNotifierProvider(create: (context) {
+          final authProvider = Provider.of<AuthProvider>(context, listen: false);
+          final token = authProvider.token;
+          if (token != null) {
+            final driverService = DriverService(token: token);
+            return DriverState(service: driverService);
+          }
+          return DriverState(service: DriverService(token: ''));
+        }),
       ],
       child: MaterialApp.router(
         title: 'تطبيق مسار',
