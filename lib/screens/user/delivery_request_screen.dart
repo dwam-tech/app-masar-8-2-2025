@@ -415,6 +415,7 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
           'price': _fareController.text.isNotEmpty ? double.tryParse(_fareController.text) : _estimatedPrice,
           'client_notes': _notesController.text,
           'phone': Provider.of<AuthProvider>(context, listen: false).userPhone ?? '',
+          'governorate': _selectedGovernorate ?? _detectedGovernorateFromLocation ?? 'غير محدد',
           'destinations': destinations,
         };
       } else {
@@ -453,6 +454,7 @@ class _DeliveryRequestScreenState extends State<DeliveryRequestScreen> {
           'price': _fareController.text.isNotEmpty ? double.tryParse(_fareController.text) : _estimatedPrice,
           'client_notes': _notesController.text,
           'phone': Provider.of<AuthProvider>(context, listen: false).userPhone ?? '',
+          'governorate': _selectedGovernorate ?? _detectedGovernorateFromLocation ?? 'غير محدد',
           'destinations': destinations,
         };
       }
