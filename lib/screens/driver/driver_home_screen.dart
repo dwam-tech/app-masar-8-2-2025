@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:saba2v2/screens/conversations_list_screen.dart';
 import 'package:saba2v2/services/driver_service.dart';
+import 'package:saba2v2/services/location_service.dart';
 import 'package:saba2v2/models/delivery_request_model.dart';
 import 'package:saba2v2/providers/driver_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -66,6 +67,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       if (_userType == 'driver') {
         // Initialize availability from user data
         isAvailableForDelivery = (userMap['is_available'] == true || userMap['is_available'] == 1);
+        
+        // التحقق من الموقع وتحديثه
+        await _checkAndUpdateLocation();
       }
       
       // Use Provider to fetch requests
@@ -86,6 +90,159 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     } finally {
       if (mounted) {
         setState(() => isLoadingPage = false);
+      }
+    }
+  }
+
+  /// التحقق من الموقع الحالي وتحديثه في قاعدة البيانات
+  Future<void> _checkAndUpdateLocation() async {
+    try {
+      debugPrint('بدء التحقق من الموقع...');
+      
+      // الحصول على الموقع الحالي مع تفاصيل العنوان
+      final locationData = await LocationService.getCurrentLocationWithAddress();
+      
+      if (locationData == null) {
+        debugPrint('فشل في الحصول على الموقع الحالي');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تعذر الحصول على الموقع الحالي. تأكد من تفعيل خدمة الموقع والصلاحيات.'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+
+      final latitude = locationData['latitude'] as double;
+      final longitude = locationData['longitude'] as double;
+      final governorate = locationData['governorate'] as String?;
+      final city = locationData['city'] as String?;
+      final currentAddress = locationData['current_address'] as String?;
+
+      debugPrint('تم الحصول على الموقع: $latitude, $longitude');
+      debugPrint('المحافظة: $governorate');
+      debugPrint('المدينة: $city');
+      debugPrint('العنوان: $currentAddress');
+
+      // التحقق من وجود بيانات الموقع المطلوبة
+      if (governorate == null || governorate.isEmpty) {
+        debugPrint('لم يتم العثور على المحافظة في بيانات الموقع');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تعذر تحديد المحافظة من الموقع الحالي'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      // التحقق من البيانات المحفوظة مسبقاً
+      final prefs = await SharedPreferences.getInstance();
+      final userJsonString = prefs.getString('user_data');
+      
+      bool needsUpdate = false;
+      String? savedGovernorate;
+      
+      if (userJsonString != null) {
+        final userMap = jsonDecode(userJsonString);
+        final savedLatitude = userMap['latitude'] as double?;
+        final savedLongitude = userMap['longitude'] as double?;
+        savedGovernorate = userMap['governorate'] as String?;
+        final savedCity = userMap['city'] as String?;
+        final savedAddress = userMap['current_address'] as String?;
+        
+        // التحقق من وجود تغيير في الموقع أو البيانات
+        if (savedLatitude == null || savedLongitude == null ||
+            (latitude - savedLatitude).abs() > 0.001 || // تغيير أكثر من 100 متر تقريباً
+            (longitude - savedLongitude).abs() > 0.001 ||
+            savedGovernorate != governorate ||
+            savedCity != city ||
+            savedAddress != currentAddress) {
+          needsUpdate = true;
+        }
+      } else {
+        needsUpdate = true;
+      }
+
+      if (needsUpdate) {
+        debugPrint('تم اكتشاف تغيير في الموقع، جاري التحديث...');
+        
+        // تحديث الموقع في قاعدة البيانات
+        if (_driverService != null) {
+          final success = await _driverService!.updateDriverLocation(
+            latitude: latitude,
+            longitude: longitude,
+            governorate: governorate,
+            city: city,
+            currentAddress: currentAddress,
+          );
+
+          if (success) {
+            debugPrint('تم تحديث الموقع بنجاح في قاعدة البيانات');
+            
+            // تحديث البيانات المحلية
+            if (userJsonString != null) {
+              final userMap = jsonDecode(userJsonString);
+              userMap['governorate'] = governorate;
+              userMap['city'] = city;
+              userMap['latitude'] = latitude;
+              userMap['longitude'] = longitude;
+              userMap['current_address'] = currentAddress;
+              userMap['location_updated_at'] = DateTime.now().toIso8601String();
+              
+              await prefs.setString('user_data', jsonEncode(userMap));
+              debugPrint('تم تحديث البيانات المحلية');
+            }
+            
+            // إظهار رسالة للمستخدم في حالة تغيير المحافظة
+            if (mounted) {
+              if (savedGovernorate != null && savedGovernorate != governorate) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('تم تحديث موقعك إلى محافظة $governorate'),
+                    backgroundColor: Colors.green,
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('تم تحديث موقعك: $governorate'),
+                    backgroundColor: Colors.green,
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              }
+            }
+          } else {
+            debugPrint('فشل في تحديث الموقع في قاعدة البيانات');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('فشل في تحديث الموقع في النظام'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
+        }
+      } else {
+        debugPrint('لا يوجد تغيير في الموقع، لا حاجة للتحديث');
+      }
+    } catch (e) {
+      debugPrint('خطأ في التحقق من الموقع وتحديثه: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في تحديث الموقع: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }

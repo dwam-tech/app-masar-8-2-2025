@@ -140,6 +140,40 @@ class DriverService {
     }
   }
 
+  /// تحديث موقع السائق
+  Future<bool> updateDriverLocation({
+    required double latitude,
+    required double longitude,
+    String? governorate,
+    String? city,
+    String? currentAddress,
+    bool locationSharingEnabled = true,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/driver/update-location'),
+        headers: _headers,
+        body: json.encode({
+          'latitude': latitude,
+          'longitude': longitude,
+          'governorate': governorate,
+          'city': city,
+          'current_address': currentAddress,
+          'location_sharing_enabled': locationSharingEnabled,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['success'] == true;
+      }
+      return false;
+    } catch (e) {
+      print('خطأ في تحديث الموقع: $e');
+      return false;
+    }
+  }
+
   // الحصول على قائمة السائقين المتاحين (الوظيفة الأصلية)
   static Future<List<Driver>> getAvailableDrivers({
     double? latitude,
