@@ -174,6 +174,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         
         // تحديث الموقع في قاعدة البيانات
         if (_driverService != null) {
+          debugPrint('إرسال طلب تحديث الموقع إلى الخادم...');
           final success = await _driverService!.updateDriverLocation(
             latitude: latitude,
             longitude: longitude,
@@ -182,6 +183,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             currentAddress: currentAddress,
           );
 
+          debugPrint('نتيجة طلب تحديث الموقع: $success');
           if (success) {
             debugPrint('تم تحديث الموقع بنجاح في قاعدة البيانات');
             

@@ -150,24 +150,37 @@ class DriverService {
     bool locationSharingEnabled = true,
   }) async {
     try {
+      print('محاولة تحديث الموقع: lat=$latitude, lng=$longitude, gov=$governorate, city=$city');
+      
+      final requestBody = {
+        'latitude': latitude,
+        'longitude': longitude,
+        'governorate': governorate,
+        'city': city,
+        'current_address': currentAddress,
+        'location_sharing_enabled': locationSharingEnabled,
+      };
+      
+      print('بيانات الطلب: ${json.encode(requestBody)}');
+      
       final response = await http.post(
         Uri.parse('$baseUrl/driver/update-location'),
         headers: _headers,
-        body: json.encode({
-          'latitude': latitude,
-          'longitude': longitude,
-          'governorate': governorate,
-          'city': city,
-          'current_address': currentAddress,
-          'location_sharing_enabled': locationSharingEnabled,
-        }),
+        body: json.encode(requestBody),
       );
+
+      print('رمز الاستجابة: ${response.statusCode}');
+      print('محتوى الاستجابة: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        return data['success'] == true;
+        final success = data['status'] == true;
+        print('نتيجة التحديث: $success');
+        return success;
+      } else {
+        print('فشل الطلب برمز: ${response.statusCode}');
+        return false;
       }
-      return false;
     } catch (e) {
       print('خطأ في تحديث الموقع: $e');
       return false;
