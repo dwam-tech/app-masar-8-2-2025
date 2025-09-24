@@ -98,6 +98,7 @@ import 'package:saba2v2/models/offer_model.dart';
 import 'package:saba2v2/models/delivery_request_model.dart';
 // إضافة NavigationService لاستخدام navigatorKey الخاص به مع GoRouter
 import 'package:saba2v2/screens/user/widgets/order_filter_widgets.dart';
+import 'package:saba2v2/screens/pending_account_screen.dart';
 
 class AppRouter {
   static GoRouter createRouter(AuthProvider authProvider) {
@@ -110,6 +111,11 @@ class AppRouter {
         // التحقق من نوع المستخدم وتوجيهه للصفحة المناسبة
         if (authProvider.isAuthenticated) {
           final userType = authProvider.userType;
+          
+          // التحقق من حالة الموافقة على الحساب أولاً
+          if (!authProvider.isApproved && state.uri.toString() != '/pending-account') {
+            return '/pending-account';
+          }
           
           // توجيه السائقين للصفحة المخصصة لهم
           if (userType == 'delivery_person' || userType == 'driver') {
@@ -186,6 +192,12 @@ class AppRouter {
               purpose: purpose ?? 'email_verification',
             );
           },
+        ),
+        // صفحة الحساب قيد المراجعة
+        GoRoute(
+          path: '/pending-account',
+          name: 'pendingAccount',
+          builder: (context, state) => const PendingAccountScreen(),
         ),
         // شاشات التسجيل كمزود خدمة
         GoRoute(

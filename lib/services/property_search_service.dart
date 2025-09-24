@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../config/api_config.dart';
+import '../config/constants.dart';
 import '../models/featured_property.dart';
 
 class PropertySearchService {
-  static const String baseUrl = ApiConfig.baseUrl;
+  static const String baseUrl = AppConstants.apiBaseUrl;
 
   /// البحث الذكي في العقارات
   static Future<Map<String, dynamic>> searchProperties({
@@ -120,36 +120,19 @@ class PropertySearchService {
         return {
           'success': true,
           'data': properties,
-          'pagination': {
-            'current_page': data['current_page'] ?? 1,
-            'last_page': data['last_page'] ?? 1,
-            'per_page': data['per_page'] ?? perPage,
-            'total': data['total'] ?? 0,
-          }
+          'pagination': data['pagination'] ?? {},
+        };
+      } else {
+        return {
+          'success': false,
+          'message': 'Failed to fetch properties',
+          'statusCode': response.statusCode,
         };
       }
-      
-      return {
-        'success': false,
-        'data': <FeaturedProperty>[],
-        'pagination': {
-          'current_page': 1,
-          'last_page': 1,
-          'per_page': perPage,
-          'total': 0,
-        }
-      };
     } catch (e) {
-      print('Error in search properties: $e');
       return {
         'success': false,
-        'data': <FeaturedProperty>[],
-        'pagination': {
-          'current_page': 1,
-          'last_page': 1,
-          'per_page': perPage,
-          'total': 0,
-        }
+        'message': 'Error in property search: $e',
       };
     }
   }

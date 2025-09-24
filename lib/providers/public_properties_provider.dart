@@ -29,11 +29,6 @@ class PublicPropertiesProvider with ChangeNotifier {
   Map<String, dynamic> get searchPagination => _searchPagination;
   int get currentPage => _currentPage;
 
-  void _setLoading(bool loading) {
-    _isLoading = loading;
-    notifyListeners();
-  }
-
   /// جلب العقارات العامة
   Future<void> fetchPublicProperties({bool loadMore = false}) async {
     if (_isLoading) return;

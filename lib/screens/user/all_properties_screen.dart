@@ -50,7 +50,7 @@ class _AllPropertiesScreenState extends State<AllPropertiesScreen> {
         _scrollController.position.maxScrollExtent - 200) {
       final provider = context.read<PublicPropertiesProvider>();
       if (provider.hasMoreData && !provider.isLoading) {
-        provider.loadMorePublicProperties().then((_) => _applyFilters());
+        provider.fetchPublicProperties(loadMore: true).then((_) => _applyFilters());
       }
     }
   }
@@ -61,7 +61,10 @@ class _AllPropertiesScreenState extends State<AllPropertiesScreen> {
 
     // تطبيق البحث النصي
     if (_searchController.text.isNotEmpty) {
-      properties = provider.searchProperties(_searchController.text);
+      // استخدام البحث الجديد من خلال API
+      final provider = context.read<PublicPropertiesProvider>();
+      provider.searchProperties(search: _searchController.text);
+      properties = provider.searchResults;
     }
 
     // تطبيق الفلتر المحدد
@@ -220,7 +223,7 @@ class _AllPropertiesScreenState extends State<AllPropertiesScreen> {
       );
     }
 
-    if (provider.hasError && provider.publicProperties.isEmpty) {
+    if (provider.error != null && provider.publicProperties.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -241,7 +244,7 @@ class _AllPropertiesScreenState extends State<AllPropertiesScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              provider.errorMessage,
+              provider.error ?? 'حدث خطأ غير معروف',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey[500],

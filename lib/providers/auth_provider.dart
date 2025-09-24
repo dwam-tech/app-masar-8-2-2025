@@ -75,6 +75,9 @@ class AuthProvider with ChangeNotifier {
   // Getter للحصول على رقم الهاتف من بيانات المستخدم
   String? get userPhone => _userData?['phone'];
 
+  // Getter للتحقق من حالة الموافقة على الحساب
+  bool get isApproved => _userData?['is_approved'] == 1 || _userData?['is_approved'] == true;
+
   //============================================================================
   // 4. دوال إدارة الحالة (Actions)
   //============================================================================
@@ -91,7 +94,26 @@ class AuthProvider with ChangeNotifier {
   /// إعادة تحميل الجلسة يدوياً (للاستخدام في حالات الأخطاء)
   Future<void> reloadSession() async {
     debugPrint("=== Manual session reload requested ===");
-    await _loadUserSession();
+    
+    try {
+      // جلب بيانات المستخدم المحدثة من الخادم
+      final updatedUserData = await _authService.fetchCurrentUser();
+      
+      // تحديث البيانات المحلية
+      await _authService.saveUserDataWithToken(
+        token: _token ?? '', 
+        userData: updatedUserData
+      );
+      
+      // إعادة تحميل الجلسة من البيانات المحدثة
+      await _loadUserSession();
+      
+      debugPrint("=== Session reloaded successfully with fresh data ===");
+    } catch (e) {
+      debugPrint("=== Error reloading session: $e ===");
+      // في حالة الخطأ، نعيد تحميل من البيانات المحلية فقط
+      await _loadUserSession();
+    }
   }
 
   /// تحميل جلسة المستخدم من التخزين المحلي وجلب بياناته (النسخة النهائية المصححة)

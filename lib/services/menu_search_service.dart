@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../config/api_config.dart';
+import '../config/constants.dart';
 
 class MenuSearchService {
-  static const String baseUrl = ApiConfig.baseUrl;
+  static const String baseUrl = AppConstants.baseUrl;
 
   /// البحث السريع في الوجبات بالأحرف الأولى
   static Future<List<Map<String, dynamic>>> quickSearchMenuItems({
