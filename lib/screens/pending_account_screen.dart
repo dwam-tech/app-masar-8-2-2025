@@ -43,8 +43,70 @@ class _PendingAccountScreenState extends State<PendingAccountScreen> {
       _registerFCMToken(authProvider.token);
     });
     
-    // بدء فحص حالة الموافقة كل 30 ثانية
+    // إعداد استقبال الإشعارات الفورية
+    _setupNotificationListener();
+    
+    // بدء فحص حالة الموافقة كل 10 ثواني (كنسخة احتياطية)
     _startApprovalCheck();
+  }
+
+  void _setupNotificationListener() {
+    // استقبال الإشعارات عندما يكون التطبيق مفتوح
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      debugPrint('Received notification while in pending screen: ${message.data}');
+      
+      // التحقق من نوع الإشعار
+      if (message.data['type'] == 'account_approved' || 
+          message.data['notification_type'] == 'account_approved') {
+        _handleAccountApproval();
+      }
+    });
+
+    // استقبال الإشعارات عند فتح التطبيق من الإشعار
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      debugPrint('App opened from notification: ${message.data}');
+      
+      if (message.data['type'] == 'account_approved' || 
+          message.data['notification_type'] == 'account_approved') {
+        _handleAccountApproval();
+      }
+    });
+  }
+
+  Future<void> _handleAccountApproval() async {
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await authProvider.reloadSession();
+      
+      // التحقق من حالة الموافقة
+      if (authProvider.isApproved) {
+        _approvalCheckTimer?.cancel();
+        
+        if (mounted) {
+          final userType = authProvider.userType;
+          String route = '/UserHomeScreen'; // افتراضي
+          
+          if (userType == 'delivery_person' || userType == 'driver') {
+            route = '/driver-home';
+          } else if (userType == 'car_rental_owner') {
+            route = '/delivery-homescreen';
+          }
+          
+          // إظهار رسالة تهنئة
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('🎉 تم قبول حسابك! مرحباً بك في منصة مسار'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 3),
+            ),
+          );
+          
+          context.go(route);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error handling account approval: $e');
+    }
   }
 
   Future<void> _registerFCMToken(String? token) async {
@@ -88,7 +150,7 @@ class _PendingAccountScreenState extends State<PendingAccountScreen> {
   }
 
   void _startApprovalCheck() {
-    _approvalCheckTimer = Timer.periodic(const Duration(seconds: 30), (timer) async {
+    _approvalCheckTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
       if (!mounted) {
         timer.cancel();
         return;
