@@ -353,7 +353,7 @@ class _PendingAccountScreenState extends State<PendingAccountScreen> {
               
               // الوصف
               Text(
-                'مرحباً بك في منصة مسار!\n\nحسابك تم إنشاؤه بنجاح وهو الآن قيد المراجعة من قبل فريق الإدارة. سيتم إشعارك فور الموافقة على حسابك.',
+                'مرحباً بك في تطبيق مسار!\n\nحسابك تم إنشاؤه بنجاح وهو الآن قيد المراجعة من قبل فريق الإدارة. سيتم إشعارك فور الموافقة على حسابك.',
                 style: TextStyle(
                   fontSize: 16,
                   color: Colors.grey[600],
@@ -365,153 +365,7 @@ class _PendingAccountScreenState extends State<PendingAccountScreen> {
               const SizedBox(height: 32),
               
               // بطاقة المحادثات والإشعارات
-              Row(
-                children: [
-                  // بطاقة المحادثات
-                  Expanded(
-                    child: Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: InkWell(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ConversationsScreen(),
-                            ),
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(16),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            children: [
-                              Container(
-                                width: 50,
-                                height: 50,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFC8700).withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(
-                                  Icons.chat_bubble_outline,
-                                  color: Color(0xFFFC8700),
-                                  size: 24,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              const Text(
-                                'المحادثات',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'تواصل مع الإدارة',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 8),
-                              Consumer<ConversationsProvider>(
-                                builder: (context, provider, child) {
-                                  final unreadCount = provider.totalUnreadCount;
-                                  if (unreadCount > 0) {
-                                    return Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.red,
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        unreadCount.toString(),
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                  return const SizedBox.shrink();
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  
-                  const SizedBox(width: 16),
-                  
-                  // بطاقة الإشعارات
-                  Expanded(
-                    child: Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: InkWell(
-                        onTap: () {
-                          context.push("/NotificationsScreen");
-                        },
-                        borderRadius: BorderRadius.circular(16),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            children: [
-                              Container(
-                                width: 50,
-                                height: 50,
-                                decoration: BoxDecoration(
-                                  color: Colors.blue.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(
-                                  Icons.notifications_outlined,
-                                  color: Colors.blue,
-                                  size: 24,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              const Text(
-                                'الإشعارات',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'تابع التحديثات',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 16),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              
+
               const SizedBox(height: 32),
               
               // معلومات إضافية
@@ -543,7 +397,7 @@ class _PendingAccountScreenState extends State<PendingAccountScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '• تأكد من صحة البيانات المدخلة\n• تواصل معنا في حالة وجود أي استفسارات\n• ستصلك رسالة تأكيد فور الموافقة على حسابك',
+                      '• تواصل معنا في حالة وجود أي استفسارات\n• ستصلك رسالة تأكيد فور الموافقة على حسابك',
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.blue[700],
