@@ -156,13 +156,20 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen>
       _resendCountdown = 60;
     });
     
+    _timer?.cancel(); // إلغاء أي timer موجود مسبقاً
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      
       if (_resendCountdown > 0) {
         setState(() {
           _resendCountdown--;
         });
       } else {
         timer.cancel();
+        setState(() {}); // تحديث الواجهة عند انتهاء العد التنازلي
       }
     });
   }

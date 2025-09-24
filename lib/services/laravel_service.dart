@@ -265,18 +265,24 @@ class LaravelService {
 
       final responseData = jsonDecode(response.body);
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 && responseData['success'] == true) {
         return {
-          'status': responseData['success'] ?? true,
+          'status': true,
           'message': responseData['message'] ?? 'تم إعادة إرسال رمز التحقق',
         };
       } else {
         debugPrint('OTP Resend Error: ${response.body}');
-        throw Exception(responseData['message'] ?? 'فشل في إعادة إرسال الرمز');
+        return {
+          'status': false,
+          'message': responseData['message'] ?? 'فشل في إعادة إرسال الرمز',
+        };
       }
     } catch (e) {
       debugPrint('Network error during OTP resend: $e');
-      throw Exception('خطأ في الشبكة أثناء إعادة إرسال الرمز: $e');
+      return {
+        'status': false,
+        'message': 'خطأ في الشبكة أثناء إعادة إرسال الرمز',
+      };
     }
   }
 
@@ -306,9 +312,9 @@ class LaravelService {
 
       final responseData = jsonDecode(response.body);
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 && responseData['success'] == true) {
         return {
-          'status': responseData['success'] ?? true,
+          'status': true,
           'message': responseData['message'] ?? 'تم إرسال رمز إعادة التعيين بنجاح',
           'data': responseData,
         };
