@@ -36,7 +36,7 @@ class StatusIndicator extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (showAnimation && status == 'pending')
+          if (showAnimation && (status == 'pending' || status == 'pending_offers'))
             SizedBox(
               width: 12,
               height: 12,
@@ -69,6 +69,7 @@ class StatusIndicator extends StatelessWidget {
   StatusConfig _getStatusConfig(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
+      case 'pending_offers':
         return StatusConfig(
           icon: Icons.hourglass_empty,
           backgroundColor: Colors.orange[50]!,
@@ -89,8 +90,11 @@ class StatusIndicator extends StatelessWidget {
           shadowColor: Colors.green[200]!.withOpacity(0.3),
         );
       
-      case 'in_progress':
-      case 'driver_on_way':
+      case 'on_way_to_pickup':
+      case 'arrived_at_pickup':
+      case 'picked_up':
+      case 'on_way_to_delivery':
+      case 'arrived_at_delivery':
         return StatusConfig(
           icon: Icons.local_shipping,
           backgroundColor: Colors.blue[50]!,
@@ -102,6 +106,7 @@ class StatusIndicator extends StatelessWidget {
       
       case 'delivered':
       case 'completed':
+      case 'trip_completed':
         return StatusConfig(
           icon: Icons.done_all,
           backgroundColor: Colors.teal[50]!,
@@ -315,10 +320,20 @@ class StatusTimeline extends StatelessWidget {
   bool _isStepCompleted(String stepStatus, String currentStatus) {
     final statusOrder = [
       'pending',
+      'pending_offers',
+      'accepted',
       'accepted_waiting_driver',
-      'driver_on_way',
-      'in_progress',
+      'driver_arrived',
+      'on_way_to_pickup',
+      'arrived_at_pickup',
+      'picked_up',
+      'trip_started',
+      'on_way_to_delivery',
+      'arrived_at_delivery',
       'delivered',
+      'trip_completed',
+      'cancelled',
+      'rejected',
     ];
     
     final stepIndex = statusOrder.indexOf(stepStatus);

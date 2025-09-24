@@ -1,23 +1,32 @@
 // lib/providers/public_properties_provider.dart
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import '../models/featured_property.dart';
 import '../services/public_properties_service.dart';
+import '../services/property_search_service.dart';
 
 class PublicPropertiesProvider with ChangeNotifier {
   List<FeaturedProperty> _publicProperties = [];
   bool _isLoading = false;
-  bool _hasError = false;
-  String _errorMessage = '';
+  String? _error;
   int _currentPage = 1;
   bool _hasMoreData = true;
 
-  // Getters
+  // Search-related properties
+  List<FeaturedProperty> _searchResults = [];
+  bool _isSearching = false;
+  String? _searchError;
+  Map<String, dynamic> _searchPagination = {};
+
   List<FeaturedProperty> get publicProperties => _publicProperties;
   bool get isLoading => _isLoading;
-  bool get hasError => _hasError;
-  String get errorMessage => _errorMessage;
+  String? get error => _error;
   bool get hasMoreData => _hasMoreData;
+
+  List<FeaturedProperty> get searchResults => _searchResults;
+  bool get isSearching => _isSearching;
+  String? get searchError => _searchError;
+  Map<String, dynamic> get searchPagination => _searchPagination;
   int get currentPage => _currentPage;
 
   void _setLoading(bool loading) {
@@ -25,54 +34,117 @@ class PublicPropertiesProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  /// جلب العقارات العامة (الصفحة الأولى)
-  Future<void> fetchPublicProperties() async {
+  /// جلب العقارات العامة
+  Future<void> fetchPublicProperties({bool loadMore = false}) async {
     if (_isLoading) return;
 
-    _setLoading(true);
-    _hasError = false;
-    _errorMessage = '';
+    if (!loadMore) {
+      _currentPage = 1;
+      _hasMoreData = true;
+      _publicProperties.clear();
+    }
+
+    if (!_hasMoreData) return;
+
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
 
     try {
-      final response = await PublicPropertiesService.getAllPublicProperties(page: 1);
-      
-      _publicProperties = response.data;
-      _currentPage = response.meta.currentPage;
-      _hasMoreData = response.links.next != null;
+      final properties = await PropertySearchService.getPublicProperties(
+        page: _currentPage,
+        perPage: 15,
+      );
 
-      print('✅ تم جلب ${_publicProperties.length} عقار عام');
-      
+      if (properties.isNotEmpty) {
+        if (loadMore) {
+          _publicProperties.addAll(properties);
+        } else {
+          _publicProperties = properties;
+        }
+        _currentPage++;
+      } else {
+        _hasMoreData = false;
+      }
     } catch (e) {
-      _hasError = true;
-      _errorMessage = e.toString();
-      print('❌ خطأ في جلب العقارات العامة: $e');
+      _error = 'حدث خطأ أثناء جلب العقارات: $e';
     } finally {
-      _setLoading(false);
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
-  /// تحميل المزيد من العقارات العامة
-  Future<void> loadMorePublicProperties() async {
-    if (_isLoading || !_hasMoreData) return;
+  /// البحث في العقارات
+  Future<void> searchProperties({
+    String? search,
+    String? type,
+    String? governorate,
+    String? city,
+    double? minPrice,
+    double? maxPrice,
+    int? bedrooms,
+    int? bathrooms,
+    double? minArea,
+    double? maxArea,
+    String? paymentMethod,
+    String? view,
+    bool? isReady,
+    bool? theBest,
+    String sortBy = 'created_at',
+    String sortOrder = 'desc',
+    int page = 1,
+    bool loadMore = false,
+  }) async {
+    if (_isSearching && !loadMore) return;
 
-    _setLoading(true);
+    if (!loadMore) {
+      _searchResults.clear();
+      _searchPagination = {};
+    }
+
+    _isSearching = true;
+    _searchError = null;
+    notifyListeners();
 
     try {
-      final nextPage = _currentPage + 1;
-      final response = await PublicPropertiesService.getAllPublicProperties(page: nextPage);
-      
-      _publicProperties.addAll(response.data);
-      _currentPage = response.meta.currentPage;
-      _hasMoreData = response.links.next != null;
+      final result = await PropertySearchService.searchProperties(
+        search: search,
+        type: type,
+        governorate: governorate,
+        city: city,
+        minPrice: minPrice,
+        maxPrice: maxPrice,
+        bedrooms: bedrooms,
+        bathrooms: bathrooms,
+        minArea: minArea,
+        maxArea: maxArea,
+        paymentMethod: paymentMethod,
+        view: view,
+        isReady: isReady,
+        theBest: theBest,
+        sortBy: sortBy,
+        sortOrder: sortOrder,
+        page: page,
+      );
 
-      print('✅ تم تحميل ${response.data.length} عقار إضافي');
-      
+      if (result['success'] == true) {
+        final List<FeaturedProperty> properties = result['data'];
+        
+        if (loadMore) {
+          _searchResults.addAll(properties);
+        } else {
+          _searchResults = properties;
+        }
+        
+        _searchPagination = result['pagination'];
+      } else {
+        _searchError = 'فشل في البحث عن العقارات';
+      }
     } catch (e) {
-      _hasError = true;
-      _errorMessage = e.toString();
-      print('❌ خطأ في تحميل المزيد من العقارات العامة: $e');
+      _searchError = 'حدث خطأ أثناء البحث: $e';
     } finally {
-      _setLoading(false);
+      _isSearching = false;
+      notifyListeners();
     }
   }
 
@@ -84,15 +156,12 @@ class PublicPropertiesProvider with ChangeNotifier {
     await fetchPublicProperties();
   }
 
-  /// البحث في العقارات العامة
-  List<FeaturedProperty> searchProperties(String query) {
-    if (query.isEmpty) return _publicProperties;
-    
-    return _publicProperties.where((property) =>
-        property.address.toLowerCase().contains(query.toLowerCase()) ||
-        property.type.toLowerCase().contains(query.toLowerCase()) ||
-        property.description.toLowerCase().contains(query.toLowerCase())
-    ).toList();
+  /// مسح نتائج البحث
+  void clearSearchResults() {
+    _searchResults.clear();
+    _searchError = null;
+    _searchPagination = {};
+    notifyListeners();
   }
 
   /// فلترة العقارات حسب النوع

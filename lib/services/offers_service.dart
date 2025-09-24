@@ -88,10 +88,11 @@ class OffersService {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = json.decode(response.body);
+        final deliveryRequestJson = data['delivery_request'];
         return {
           'success': true,
           'message': data['message'] ?? 'تم قبول العرض بنجاح',
-          'data': data['data'],
+          'deliveryRequest': deliveryRequestJson != null ? DeliveryRequestModel.fromJson(deliveryRequestJson) : null,
         };
       } else if (response.statusCode == 400) {
         final errorData = json.decode(response.body);
@@ -196,7 +197,6 @@ class OffersService {
         return {
           'success': true,
           'message': data['message'] ?? 'تم إلغاء الطلب بنجاح',
-          'data': data['data'],
         };
       } else if (response.statusCode == 400) {
         final errorData = json.decode(response.body);

@@ -51,7 +51,7 @@ class DeliveryRequestModel {
       carCategory: json['car_category'] ?? 'اقتصادية',
       paymentMethod: json['payment_method'] ?? 'كاش',
       notes: json['notes'],
-      status: json['status'] ?? 'pending',
+      status: json['status'] ?? 'pending_offers',
       createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
       offers: (json['offers'] as List<dynamic>?)
           ?.map((offerJson) => OfferModel.fromJson(offerJson))
@@ -78,19 +78,62 @@ class DeliveryRequestModel {
     };
   }
 
-  // دالة لتحويل الحالة إلى نص عربي
+  // copyWith لتحديث حقول معينة مع الحفاظ على القيم الأخرى
+  DeliveryRequestModel copyWith({
+    int? id,
+    String? fromLocation,
+    String? toLocation,
+    String? fromLocationUrl,
+    String? toLocationUrl,
+    double? requestedPrice,
+    int? passengers,
+    String? tripType,
+    String? deliveryTime,
+    String? carCategory,
+    String? paymentMethod,
+    String? notes,
+    String? status,
+    DateTime? createdAt,
+    List<OfferModel>? offers,
+    DriverModel? driver,
+  }) {
+    return DeliveryRequestModel(
+      id: id ?? this.id,
+      fromLocation: fromLocation ?? this.fromLocation,
+      toLocation: toLocation ?? this.toLocation,
+      fromLocationUrl: fromLocationUrl ?? this.fromLocationUrl,
+      toLocationUrl: toLocationUrl ?? this.toLocationUrl,
+      requestedPrice: requestedPrice ?? this.requestedPrice,
+      passengers: passengers ?? this.passengers,
+      tripType: tripType ?? this.tripType,
+      deliveryTime: deliveryTime ?? this.deliveryTime,
+      carCategory: carCategory ?? this.carCategory,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      notes: notes ?? this.notes,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
+      offers: offers ?? this.offers,
+      driver: driver ?? this.driver,
+    );
+  }
+
+  // ترجمة الحالة إلى نص عربي متوافق مع الباك إند
   String get statusTranslated {
     switch (status) {
-      case 'pending':
-        return 'في الانتظار';
-      case 'accepted':
-        return 'مقبول';
-      case 'in_progress':
-        return 'قيد التنفيذ';
-      case 'completed':
-        return 'مكتمل';
+      case 'pending_offers':
+        return 'في انتظار العروض';
+      case 'accepted_waiting_driver':
+        return 'مقبول - انتظار السائق';
+      case 'driver_arrived':
+        return 'وصل السائق';
+      case 'trip_started':
+        return 'بدأت الرحلة';
+      case 'trip_completed':
+        return 'انتهت الرحلة';
       case 'cancelled':
         return 'ملغي';
+      case 'rejected':
+        return 'مرفوض';
       default:
         return 'غير محدد';
     }

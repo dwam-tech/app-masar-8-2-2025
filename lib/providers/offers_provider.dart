@@ -36,9 +36,19 @@ class OffersProvider with ChangeNotifier {
   String? get lastMessage => _lastMessage;
   bool get hasData => _deliveryRequest != null;
   bool get hasOffers => _offers.isNotEmpty;
-  bool get isRequestAccepted => _deliveryRequest?.status == 'accepted_waiting_driver' || 
-                                _deliveryRequest?.status == 'in_progress' ||
-                                _deliveryRequest?.status == 'delivered';
+  bool get isRequestAccepted => [
+    'accepted',
+    'accepted_waiting_driver',
+    'on_way_to_pickup',
+    'arrived_at_pickup',
+    'picked_up',
+    'on_way_to_delivery',
+    'arrived_at_delivery',
+    'driver_arrived',
+    'trip_started',
+    'trip_completed',
+    'delivered',
+  ].contains(_deliveryRequest?.status);
   
   // Load delivery request and offers
   Future<void> loadDeliveryRequestWithOffers(String requestId) async {
@@ -67,9 +77,7 @@ class OffersProvider with ChangeNotifier {
         final data = result['data'];
         if (data != null) {
           _deliveryRequest = data['delivery_request'];
-          _offers = List<OfferModel>.from(
-            (data['offers'] ?? []).map((offer) => OfferModel.fromJson(offer))
-          );
+          _offers = List<OfferModel>.from(data['offers'] ?? []);
           
           // إذا لم تكن هناك عروض، لا نعتبر هذا خطأ
           // بل نعرض الرسالة التوضيحية من الخادم
@@ -183,7 +191,7 @@ class OffersProvider with ChangeNotifier {
         return false;
       }
       
-      if (_deliveryRequest?.status == 'completed') {
+      if (_deliveryRequest?.status == 'trip_completed' || _deliveryRequest?.status == 'delivered') {
         _setError('لا يمكن إلغاء طلب مكتمل');
         return false;
       }
@@ -197,7 +205,7 @@ class OffersProvider with ChangeNotifier {
       
       if (result != null && result['success']) {
         // Update local state
-        _deliveryRequest = result['deliveryRequest'];
+        _deliveryRequest = _deliveryRequest?.copyWith(status: 'cancelled');
         _offers.clear(); // Clear offers as request is cancelled
         _stopAutoRefresh(); // Stop auto refresh as request is cancelled
         return true;

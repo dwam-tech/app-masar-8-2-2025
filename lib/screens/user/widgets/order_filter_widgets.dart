@@ -392,6 +392,32 @@ class OrderFilterWidgets {
         return 'مكتمل';
       case 'cancelled':
         return 'ملغي';
+      // Delivery journey (backend) statuses
+      case 'pending_offers':
+        return 'في انتظار العروض';
+      case 'accepted':
+      case 'accepted_waiting_driver':
+        return 'مقبول - انتظار السائق';
+      case 'driver_arrived':
+        return 'وصل السائق';
+      case 'trip_started':
+        return 'بدأت الرحلة';
+      case 'trip_completed':
+        return 'انتهت الرحلة';
+      case 'on_way_to_pickup':
+        return 'في الطريق إلى الاستلام';
+      case 'arrived_at_pickup':
+        return 'تم الوصول للاستلام';
+      case 'picked_up':
+        return 'تم الاستلام';
+      case 'on_way_to_delivery':
+        return 'في الطريق إلى التسليم';
+      case 'arrived_at_delivery':
+        return 'تم الوصول للتسليم';
+      case 'delivered':
+        return 'تم التسليم';
+      case 'rejected':
+        return 'مرفوض';
       default:
         return status;
     }

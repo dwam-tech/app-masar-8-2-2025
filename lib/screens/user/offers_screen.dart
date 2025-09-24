@@ -244,7 +244,7 @@ class _OffersScreenState extends State<OffersScreen>
         return;
       }
       
-      if (currentStatus == 'completed') {
+      if (currentStatus == 'trip_completed' || currentStatus == 'delivered') {
         _errorHandler.showError(context, Exception('لا يمكن إلغاء طلب مكتمل'));
         return;
       }

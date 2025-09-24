@@ -15,6 +15,7 @@ import 'package:saba2v2/screens/all_restaurants_screen.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:saba2v2/providers/banner_provider.dart';
+import 'package:saba2v2/services/menu_search_service.dart';
 
 class UserRestaurantHome extends StatefulWidget {
   const UserRestaurantHome({super.key});
@@ -31,6 +32,11 @@ class _UserRestaurantHomeState extends State<UserRestaurantHome> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   static const double _tabletBreakpoint = 768.0;
+
+  // متغيرات البحث في الوجبات
+  List<Map<String, dynamic>> _searchResults = [];
+  bool _isSearching = false;
+  Timer? _searchTimer;
 
   // قائمة المحافظات الحالية كما هي في المشروع
   final List<String> _cities = const [
@@ -136,6 +142,7 @@ static const Map<String, List<String>> _neighborhoodsMap = {
   @override
   void dispose() {
     _pageController.dispose();
+    _searchTimer?.cancel();
     super.dispose();
   }
 
@@ -293,6 +300,47 @@ static const Map<String, List<String>> _neighborhoodsMap = {
   }
 
   String _normalize(String s) => s.toLowerCase().replaceAll(RegExp(r'\s+'), ' ').trim();
+
+  // دالة البحث السريع في الوجبات
+  void _performQuickMealSearch(String query) {
+    // إلغاء البحث السابق
+    _searchTimer?.cancel();
+    
+    if (query.isEmpty) {
+      setState(() {
+        _searchResults.clear();
+        _isSearching = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isSearching = true;
+    });
+
+    // تأخير البحث لتجنب الطلبات المتكررة
+    _searchTimer = Timer(const Duration(milliseconds: 500), () async {
+      try {
+        final results = await MenuSearchService.quickSearchMenuItems(
+          search: query,
+        );
+        
+        if (mounted) {
+          setState(() {
+            _searchResults = results;
+            _isSearching = false;
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _searchResults.clear();
+            _isSearching = false;
+          });
+        }
+      }
+    });
+  }
 
   PreferredSizeWidget _buildAppBar(bool isTablet) {
     return AppBar(
@@ -557,6 +605,164 @@ static const Map<String, List<String>> _neighborhoodsMap = {
     );
   }
 
+  // بناء عرض نتائج البحث في الوجبات
+  Widget _buildSearchResults() {
+    if (_isSearching) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              spreadRadius: 1,
+              blurRadius: 5,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: const Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFFFC8700),
+          ),
+        ),
+      );
+    }
+
+    if (_searchResults.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 5,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                const Icon(Icons.restaurant_menu, color: Color(0xFFFC8700)),
+                const SizedBox(width: 8),
+                Text(
+                  'نتائج البحث في الوجبات (${_searchResults.length})',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _searchResults.length,
+            separatorBuilder: (context, index) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final item = _searchResults[index];
+              return ListTile(
+                leading: item['image'] != null && item['image'].isNotEmpty
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          item['image'],
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: 50,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[200],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.restaurant_menu,
+                                color: Colors.grey,
+                              ),
+                            );
+                          },
+                        ),
+                      )
+                    : Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[200],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.restaurant_menu,
+                          color: Colors.grey,
+                        ),
+                      ),
+                title: Text(
+                  item['title'] ?? 'وجبة غير محددة',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (item['description'] != null && item['description'].isNotEmpty)
+                      Text(
+                        item['description'],
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 12,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${item['price']} جنيه',
+                      style: const TextStyle(
+                        color: Color(0xFFFC8700),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+                trailing: const Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: Colors.grey,
+                ),
+                onTap: () {
+                  // يمكن إضافة التنقل إلى تفاصيل الوجبة أو المطعم هنا
+                  final restaurantId = item['restaurant_id'];
+                  if (restaurantId != null) {
+                    context.push('/restaurant-details/$restaurantId');
+                  }
+                },
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _sliderIndicator(int bannersLength) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -678,6 +884,10 @@ static const Map<String, List<String>> _neighborhoodsMap = {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         TextField(
+                          onChanged: (value) {
+                            // تنفيذ البحث السريع في الوجبات
+                            _performQuickMealSearch(value);
+                          },
                           decoration: InputDecoration(
                             filled: true,
                             fillColor: Colors.white,
@@ -709,6 +919,13 @@ static const Map<String, List<String>> _neighborhoodsMap = {
                           ),
                         ),
                         const SizedBox(height: 16.0),
+                        
+                        // عرض نتائج البحث في الوجبات
+                        if (_isSearching || _searchResults.isNotEmpty) ...[
+                          _buildSearchResults(),
+                          const SizedBox(height: 16.0),
+                        ],
+                        
                         _buildBannersSection(restaurantProvider),
                         const SizedBox(height: 16.0),
                         const SectionTitle(title: "اختر نوع الطعام"),
