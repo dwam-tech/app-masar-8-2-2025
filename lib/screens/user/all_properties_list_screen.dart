@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import '../../providers/featured_properties_provider.dart';
-import '../../models/featured_property.dart';
-import '../../widgets/property_card.dart'; // استيراد البطاقة المنفصلة
+import '../../providers/public_properties_provider.dart';
+import '../../widgets/public_property_card.dart';
 
 class AllPropertiesListScreen extends StatefulWidget {
   const AllPropertiesListScreen({super.key});
@@ -20,7 +19,7 @@ class _AllPropertiesListScreenState extends State<AllPropertiesListScreen> {
     super.initState();
     // جلب العقارات عند تحميل الصفحة
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<FeaturedPropertiesProvider>().fetchFeaturedProperties();
+      context.read<PublicPropertiesProvider>().fetchPublicProperties();
     });
     
     // إضافة مستمع للتمرير لتحميل المزيد
@@ -35,10 +34,10 @@ class _AllPropertiesListScreenState extends State<AllPropertiesListScreen> {
 
   void _onScroll() {
     if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
-      final provider = context.read<FeaturedPropertiesProvider>();
+      final provider = context.read<PublicPropertiesProvider>();
       if (!provider.isLoading && provider.hasMoreData) {
         debugPrint('📄 تحميل المزيد من العقارات...');
-        provider.loadMoreFeaturedProperties();
+        provider.fetchPublicProperties(loadMore: true);
       }
     }
   }
@@ -73,19 +72,19 @@ class _AllPropertiesListScreenState extends State<AllPropertiesListScreen> {
             ),
           ],
         ),
-        body: Consumer<FeaturedPropertiesProvider>(
+        body: Consumer<PublicPropertiesProvider>(
           builder: (context, provider, child) {
-            debugPrint('🏠 عدد العقارات المحملة: ${provider.featuredProperties.length}');
+            debugPrint('🏠 عدد العقارات المحملة: ${provider.publicProperties.length}');
             
-            if (provider.isLoading && provider.featuredProperties.isEmpty) {
+            if (provider.isLoading && provider.publicProperties.isEmpty) {
               return _buildLoadingState();
             }
 
-            if (provider.errorMessage != null && provider.featuredProperties.isEmpty) {
-              return _buildErrorState(provider.errorMessage!);
+            if (provider.error != null && provider.publicProperties.isEmpty) {
+              return _buildErrorState(provider.error!);
             }
 
-            if (provider.featuredProperties.isEmpty) {
+            if (provider.publicProperties.isEmpty) {
               return _buildEmptyState();
             }
 
@@ -162,7 +161,7 @@ class _AllPropertiesListScreenState extends State<AllPropertiesListScreen> {
             const SizedBox(height: 32),
             ElevatedButton(
               onPressed: () {
-                context.read<FeaturedPropertiesProvider>().fetchFeaturedProperties();
+                context.read<PublicPropertiesProvider>().refreshPublicProperties();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFC8700),
@@ -229,7 +228,7 @@ class _AllPropertiesListScreenState extends State<AllPropertiesListScreen> {
             const SizedBox(height: 32),
             ElevatedButton(
               onPressed: () {
-                context.read<FeaturedPropertiesProvider>().fetchFeaturedProperties();
+                context.read<PublicPropertiesProvider>().refreshPublicProperties();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFC8700),
@@ -254,10 +253,10 @@ class _AllPropertiesListScreenState extends State<AllPropertiesListScreen> {
     );
   }
 
-  Widget _buildPropertiesList(FeaturedPropertiesProvider provider) {
+  Widget _buildPropertiesList(PublicPropertiesProvider provider) {
     return RefreshIndicator(
       onRefresh: () async {
-        await provider.refreshFeaturedProperties();
+        await provider.refreshPublicProperties();
       },
       color: const Color(0xFFFC8700),
       child: Column(
@@ -281,7 +280,7 @@ class _AllPropertiesListScreenState extends State<AllPropertiesListScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'تم العثور على ${provider.featuredProperties.length} عقار',
+                  'تم العثور على ${provider.publicProperties.length} عقار',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -305,10 +304,10 @@ class _AllPropertiesListScreenState extends State<AllPropertiesListScreen> {
             child: ListView.builder(
               controller: _scrollController,
               padding: const EdgeInsets.all(16),
-              itemCount: provider.featuredProperties.length + (provider.isLoading ? 1 : 0),
+              itemCount: provider.publicProperties.length + (provider.isLoading ? 1 : 0),
               itemBuilder: (context, index) {
                 // إذا كان العنصر الأخير وهناك تحميل جاري
-                if (index == provider.featuredProperties.length && provider.isLoading) {
+                if (index == provider.publicProperties.length && provider.isLoading) {
                   return Container(
                     padding: const EdgeInsets.all(32),
                     child: const Center(
@@ -334,14 +333,18 @@ class _AllPropertiesListScreenState extends State<AllPropertiesListScreen> {
                 }
                 
                 // عرض كارت العقار
-                final property = provider.featuredProperties[index];
+                final property = provider.publicProperties[index];
+                
+                // إضافة تسجيل للتشخيص
+                debugPrint('🏠 عرض العقار ${index + 1}: ${property.address} - ${property.type}');
+                
                 return Container(
                   margin: const EdgeInsets.only(bottom: 16),
-                  child: PropertyCard(
+                  child: PublicPropertyCard(
                     property: property,
                     onTap: () {
                       debugPrint('🏠 الانتقال إلى تفاصيل العقار: ${property.id}');
-                      context.push('/propertyDetails/${property.id}');
+                      context.push('/property-details/${property.id}');
                     },
                   ),
                 );

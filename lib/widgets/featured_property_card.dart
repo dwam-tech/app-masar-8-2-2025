@@ -18,6 +18,9 @@ class FeaturedPropertyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // إضافة تسجيل للتشخيص
+    debugPrint('🎨 بناء بطاقة العقار: ${property.id} - ${property.address}');
+    
     return Directionality(
       textDirection: TextDirection.rtl,
       child: GestureDetector(
@@ -50,7 +53,7 @@ class FeaturedPropertyCard extends StatelessWidget {
                       topLeft: Radius.circular(16),
                       topRight: Radius.circular(16),
                     ),
-                    child: Container(
+                    child: SizedBox(
                       width: double.infinity,
                       height: isHorizontalLayout ? 130 : 160,
                       child: CachedNetworkImage(

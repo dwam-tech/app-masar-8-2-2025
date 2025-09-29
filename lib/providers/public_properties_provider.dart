@@ -1,29 +1,28 @@
 // lib/providers/public_properties_provider.dart
 
 import 'package:flutter/material.dart';
-import '../models/featured_property.dart';
-import '../services/public_properties_service.dart';
+import '../models/public_property.dart';
 import '../services/property_search_service.dart';
 
 class PublicPropertiesProvider with ChangeNotifier {
-  List<FeaturedProperty> _publicProperties = [];
+  List<PublicProperty> _publicProperties = [];
   bool _isLoading = false;
   String? _error;
   int _currentPage = 1;
   bool _hasMoreData = true;
 
   // Search-related properties
-  List<FeaturedProperty> _searchResults = [];
+  List<PublicProperty> _searchResults = [];
   bool _isSearching = false;
   String? _searchError;
   Map<String, dynamic> _searchPagination = {};
 
-  List<FeaturedProperty> get publicProperties => _publicProperties;
+  List<PublicProperty> get publicProperties => _publicProperties;
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get hasMoreData => _hasMoreData;
 
-  List<FeaturedProperty> get searchResults => _searchResults;
+  List<PublicProperty> get searchResults => _searchResults;
   bool get isSearching => _isSearching;
   String? get searchError => _searchError;
   Map<String, dynamic> get searchPagination => _searchPagination;
@@ -123,7 +122,7 @@ class PublicPropertiesProvider with ChangeNotifier {
       );
 
       if (result['success'] == true) {
-        final List<FeaturedProperty> properties = result['data'];
+        final List<PublicProperty> properties = result['data'];
         
         if (loadMore) {
           _searchResults.addAll(properties);
@@ -160,13 +159,13 @@ class PublicPropertiesProvider with ChangeNotifier {
   }
 
   /// فلترة العقارات حسب النوع
-  List<FeaturedProperty> getPropertiesByType(String type) {
+  List<PublicProperty> getPropertiesByType(String type) {
     return _publicProperties.where((property) => 
         property.type.toLowerCase().contains(type.toLowerCase())).toList();
   }
 
   /// فلترة العقارات حسب النطاق السعري
-  List<FeaturedProperty> getPropertiesByPriceRange(double minPrice, double maxPrice) {
+  List<PublicProperty> getPropertiesByPriceRange(double minPrice, double maxPrice) {
     return _publicProperties.where((property) {
       try {
         final propertyPrice = double.parse(property.price);
@@ -179,12 +178,12 @@ class PublicPropertiesProvider with ChangeNotifier {
   }
 
   /// الحصول على أفضل العقارات
-  List<FeaturedProperty> getBestProperties() {
+  List<PublicProperty> getBestProperties() {
     return _publicProperties.where((property) => property.theBest).toList();
   }
 
   /// الحصول على العقارات الجاهزة
-  List<FeaturedProperty> getReadyProperties() {
+  List<PublicProperty> getReadyProperties() {
     return _publicProperties.where((property) => property.isReady).toList();
   }
 }

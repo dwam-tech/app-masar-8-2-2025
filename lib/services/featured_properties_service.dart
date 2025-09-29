@@ -37,9 +37,41 @@ class FeaturedPropertiesService {
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
-        return FeaturedPropertiesResponse.fromJson(jsonData);
+        
+        // التحقق من وجود البيانات في التنسيق الصحيح
+        if (jsonData is Map<String, dynamic> && jsonData.containsKey('data')) {
+          return FeaturedPropertiesResponse.fromJson(jsonData);
+        } else {
+          // إذا كانت البيانات في تنسيق مختلف، نحاول التعامل معها
+          final List<dynamic> propertiesData = jsonData is List ? jsonData : [];
+          final List<FeaturedProperty> properties = [];
+          
+          for (var item in propertiesData) {
+            try {
+              properties.add(FeaturedProperty.fromJson(item as Map<String, dynamic>));
+            } catch (e) {
+              print('❌ خطأ في تحليل عقار مميز: $e');
+            }
+          }
+          
+          return FeaturedPropertiesResponse(
+            status: true,
+            data: properties,
+            links: PaginationLinks(
+              first: null,
+              last: null,
+              prev: null,
+              next: null,
+            ),
+            meta: PaginationMeta(
+              currentPage: page,
+              total: properties.length,
+            ),
+          );
+        }
       } else {
-        throw Exception('فشل في جلب العقارات المميزة: ${response.statusCode}');
+        final errorData = json.decode(response.body);
+        throw Exception(errorData['message'] ?? 'فشل في جلب العقارات المميزة: ${response.statusCode}');
       }
     } catch (e) {
       print('❌ خطأ في جلب العقارات المميزة: $e');

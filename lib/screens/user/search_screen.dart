@@ -3,8 +3,7 @@ import 'package:provider/provider.dart';
 import '../../providers/restaurant_provider.dart';
 import '../../providers/public_properties_provider.dart';
 import '../../widgets/restaurant_api_card.dart';
-import '../../widgets/featured_property_card.dart';
-import '../../models/featured_property.dart';
+import '../../widgets/public_property_card.dart';
 import 'package:go_router/go_router.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -552,7 +551,7 @@ class _SearchScreenState extends State<SearchScreen> {
             final property = properties[index];
             return Padding(
               padding: EdgeInsets.only(bottom: 16),
-              child: FeaturedPropertyCard(
+              child: PublicPropertyCard(
                 property: property,
                 isHorizontalLayout: false,
                 onTap: () {

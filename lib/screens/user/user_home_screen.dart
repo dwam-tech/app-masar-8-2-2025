@@ -776,7 +776,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
           right: isTablet ? 32.0 : 16.0,
           left: isTablet ? 32.0 : 16.0,
           top: isTablet ? 20.0 : 40.0,
-          bottom: 15,
+          bottom: 12,
         ),
         child: Column(
           children: [
@@ -786,7 +786,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                 Row(
                   children: [
                     Icon(Icons.menu,size: isTablet ? 26 : 24, color: Colors.orange[900],),
-                    SizedBox(width: 10,),
+                    SizedBox(width: 8,),
                     Text(
                       "الرئيسية",
                       style: TextStyle(

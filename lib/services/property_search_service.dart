@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/constants.dart';
-import '../models/featured_property.dart';
+import '../models/public_property.dart';
 
 class PropertySearchService {
   static const String baseUrl = AppConstants.apiBaseUrl;
@@ -105,12 +105,12 @@ class PropertySearchService {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         
-        // تحويل البيانات إلى قائمة من FeaturedProperty
-        final List<FeaturedProperty> properties = [];
+        // تحويل البيانات إلى قائمة من PublicProperty
+        final List<PublicProperty> properties = [];
         if (data['data'] != null) {
           for (var item in data['data']) {
             try {
-              properties.add(FeaturedProperty.fromJson(item));
+              properties.add(PublicProperty.fromJson(item));
             } catch (e) {
               print('Error parsing property: $e');
             }
@@ -138,7 +138,7 @@ class PropertySearchService {
   }
 
   /// الحصول على جميع العقارات العامة (الطريقة الأساسية)
-  static Future<List<FeaturedProperty>> getPublicProperties({
+  static Future<List<PublicProperty>> getPublicProperties({
     bool? theBest,
     String? type,
     int page = 1,
@@ -172,11 +172,11 @@ class PropertySearchService {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         
-        final List<FeaturedProperty> properties = [];
+        final List<PublicProperty> properties = [];
         if (data['data'] != null) {
           for (var item in data['data']) {
             try {
-              properties.add(FeaturedProperty.fromJson(item));
+              properties.add(PublicProperty.fromJson(item));
             } catch (e) {
               print('Error parsing property: $e');
             }

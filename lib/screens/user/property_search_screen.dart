@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:saba2v2/providers/public_properties_provider.dart';
-import 'package:saba2v2/models/featured_property.dart';
+import 'package:saba2v2/models/public_property.dart';
 import 'package:saba2v2/widgets/real_estate_card.dart';
 
 class PropertySearchScreen extends StatefulWidget {
@@ -60,7 +60,7 @@ class _PropertySearchScreenState extends State<PropertySearchScreen> {
     });
   }
 
-  List<FeaturedProperty> _getFilteredResults(PublicPropertiesProvider provider) {
+  List<PublicProperty> _getFilteredResults(PublicPropertiesProvider provider) {
     var results = provider.publicProperties;
     
     // فلترة حسب البحث

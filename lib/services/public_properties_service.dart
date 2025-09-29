@@ -2,7 +2,7 @@
 
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../models/featured_property.dart';
+import '../models/public_property.dart';
 import '../utils/constants.dart';
 
 class PublicPropertiesService {
@@ -10,7 +10,7 @@ class PublicPropertiesService {
 
   /// جلب جميع العقارات العامة
   /// [page] رقم الصفحة (افتراضي: 1)
-  static Future<FeaturedPropertiesResponse> getAllPublicProperties({
+  static Future<List<PublicProperty>> getAllPublicProperties({
     int page = 1,
   }) async {
     try {
@@ -39,34 +39,32 @@ class PublicPropertiesService {
         
         // التحقق من وجود البيانات في التنسيق الصحيح
         if (jsonData is Map<String, dynamic> && jsonData.containsKey('data')) {
-          return FeaturedPropertiesResponse.fromJson(jsonData);
-        } else {
-          // إذا كانت البيانات في تنسيق مختلف، نحاول التعامل معها
-          final List<dynamic> propertiesData = jsonData is List ? jsonData : [];
-          final List<FeaturedProperty> properties = [];
+          final List<dynamic> propertiesData = jsonData['data'] as List<dynamic>;
+          final List<PublicProperty> properties = [];
           
           for (var item in propertiesData) {
             try {
-              properties.add(FeaturedProperty.fromJson(item as Map<String, dynamic>));
+              properties.add(PublicProperty.fromJson(item as Map<String, dynamic>));
+            } catch (e) {
+              print('❌ خطأ في تحويل العقار: $e');
+            }
+          }
+          
+          return properties;
+        } else {
+          // إذا كانت البيانات في تنسيق مختلف، نحاول التعامل معها
+          final List<dynamic> propertiesData = jsonData is List ? jsonData : [];
+          final List<PublicProperty> properties = [];
+          
+          for (var item in propertiesData) {
+            try {
+              properties.add(PublicProperty.fromJson(item as Map<String, dynamic>));
             } catch (e) {
               print('❌ خطأ في تحليل عقار: $e');
             }
           }
           
-          return FeaturedPropertiesResponse(
-            status: true,
-            data: properties,
-            links: PaginationLinks(
-              first: null,
-              last: null,
-              prev: null,
-              next: null,
-            ),
-            meta: PaginationMeta(
-              currentPage: page,
-              total: properties.length,
-            ),
-          );
+          return properties;
         }
       } else {
         final errorData = json.decode(response.body);
@@ -79,12 +77,12 @@ class PublicPropertiesService {
   }
 
   /// جلب المزيد من العقارات العامة (للتحميل التدريجي)
-  static Future<List<FeaturedProperty>> loadMorePublicProperties({
+  static Future<List<PublicProperty>> loadMorePublicProperties({
     required int page,
   }) async {
     try {
       final response = await getAllPublicProperties(page: page);
-      return response.data;
+      return response;
     } catch (e) {
       print('❌ خطأ في تحميل المزيد من العقارات العامة: $e');
       return [];

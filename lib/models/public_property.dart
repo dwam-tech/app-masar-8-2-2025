@@ -1,9 +1,7 @@
 import 'package:flutter/foundation.dart';
 
-class FeaturedProperty {
+class PublicProperty {
   final int id;
-  final int realEstateId;
-  final int userId;
   final String address;
   final String type;
   final String price;
@@ -17,12 +15,10 @@ class FeaturedProperty {
   final bool isReady;
   final bool theBest;
   final String createdAt;
-  final PropertyProvider provider;
+  final PropertyProvider? provider;
 
-  FeaturedProperty({
+  PublicProperty({
     required this.id,
-    required this.realEstateId,
-    required this.userId,
     required this.address,
     required this.type,
     required this.price,
@@ -36,39 +32,37 @@ class FeaturedProperty {
     required this.isReady,
     required this.theBest,
     required this.createdAt,
-    required this.provider,
+    this.provider,
   });
 
-  factory FeaturedProperty.fromJson(Map<String, dynamic> json) {
-    // إضافة تسجيل للتشخيص
-    debugPrint('🔍 تحليل عقار: ${json['id']} - ${json['address']} - ${json['type']}');
+  factory PublicProperty.fromJson(Map<String, dynamic> json) {
+    debugPrint('🔍 تحليل عقار عام: ${json['id']} - ${json['address']} - ${json['type']}');
+    debugPrint('🖼️ رابط الصورة: ${json['image_url']}');
     
-    return FeaturedProperty(
+    return PublicProperty(
       id: json['id'] ?? 0,
-      realEstateId: json['real_estate_id'] ?? 0,
-      userId: json['user_id'] ?? 0,
       address: json['address'] ?? '',
       type: json['type'] ?? '',
       price: json['price']?.toString() ?? '0',
       description: json['description'] ?? '',
-      imageUrl: json['image_url'] ?? '',
+      imageUrl: json['image_url'] ?? json['image'] ?? '',
       bedrooms: json['bedrooms'] ?? 0,
       bathrooms: json['bathrooms'] ?? 0,
       view: json['view'] ?? '',
       paymentMethod: json['payment_method'] ?? '',
       area: json['area'] ?? '',
-      isReady: json['is_ready'] ?? false,
-      theBest: json['the_best'] ?? false,
+      isReady: json['is_ready'] == true || json['is_ready'] == 1,
+      theBest: json['the_best'] == true || json['the_best'] == 1,
       createdAt: json['created_at'] ?? '',
-      provider: PropertyProvider.fromJson(json['provider'] ?? {}),
+      provider: json['provider'] != null 
+          ? PropertyProvider.fromJson(json['provider']) 
+          : null,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'real_estate_id': realEstateId,
-      'user_id': userId,
       'address': address,
       'type': type,
       'price': price,
@@ -82,7 +76,7 @@ class FeaturedProperty {
       'is_ready': isReady,
       'the_best': theBest,
       'created_at': createdAt,
-      'provider': provider.toJson(),
+      'provider': provider?.toJson(),
     };
   }
 }
@@ -124,70 +118,5 @@ class PropertyProvider {
       'profile_image': profileImage,
       'user_type': userType,
     };
-  }
-}
-
-class FeaturedPropertiesResponse {
-  final bool status;
-  final List<FeaturedProperty> data;
-  final PaginationLinks links;
-  final PaginationMeta meta;
-
-  FeaturedPropertiesResponse({
-    required this.status,
-    required this.data,
-    required this.links,
-    required this.meta,
-  });
-
-  factory FeaturedPropertiesResponse.fromJson(Map<String, dynamic> json) {
-    return FeaturedPropertiesResponse(
-      status: json['status'] ?? false,
-      data: (json['data'] as List<dynamic>?)
-          ?.map((item) => FeaturedProperty.fromJson(item))
-          .toList() ?? [],
-      links: PaginationLinks.fromJson(json['links'] ?? {}),
-      meta: PaginationMeta.fromJson(json['meta'] ?? {}),
-    );
-  }
-}
-
-class PaginationLinks {
-  final String? first;
-  final String? last;
-  final String? prev;
-  final String? next;
-
-  PaginationLinks({
-    this.first,
-    this.last,
-    this.prev,
-    this.next,
-  });
-
-  factory PaginationLinks.fromJson(Map<String, dynamic> json) {
-    return PaginationLinks(
-      first: json['first'],
-      last: json['last'],
-      prev: json['prev'],
-      next: json['next'],
-    );
-  }
-}
-
-class PaginationMeta {
-  final int currentPage;
-  final int total;
-
-  PaginationMeta({
-    required this.currentPage,
-    required this.total,
-  });
-
-  factory PaginationMeta.fromJson(Map<String, dynamic> json) {
-    return PaginationMeta(
-      currentPage: json['current_page'] ?? 1,
-      total: json['total'] ?? 0,
-    );
   }
 }

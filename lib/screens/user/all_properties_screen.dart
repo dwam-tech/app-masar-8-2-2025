@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/public_properties_provider.dart';
-import '../../widgets/featured_property_card.dart';
-import '../../models/featured_property.dart';
+import '../../widgets/public_property_card.dart';
+import '../../models/public_property.dart';
 
 class AllPropertiesScreen extends StatefulWidget {
   const AllPropertiesScreen({super.key});
@@ -20,7 +20,7 @@ class _AllPropertiesScreenState extends State<AllPropertiesScreen> {
   
   String _selectedFilter = 'الكل';
   final List<String> _filterOptions = ['الكل', 'شقة', 'فيلا', 'محل تجاري'];
-  List<FeaturedProperty> _filteredProperties = [];
+  List<PublicProperty> _filteredProperties = [];
 
   @override
   void initState() {
@@ -57,7 +57,7 @@ class _AllPropertiesScreenState extends State<AllPropertiesScreen> {
 
   void _applyFilters() {
     final provider = context.read<PublicPropertiesProvider>();
-    List<FeaturedProperty> properties = provider.publicProperties;
+    List<PublicProperty> properties = provider.publicProperties;
 
     // تطبيق البحث النصي
     if (_searchController.text.isNotEmpty) {
@@ -318,7 +318,7 @@ class _AllPropertiesScreenState extends State<AllPropertiesScreen> {
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
                   final property = _filteredProperties[index];
-                  return FeaturedPropertyCard(
+                  return PublicPropertyCard(
                     property: property,
                     onTap: () {
                       // الانتقال إلى صفحة تفاصيل العقار
