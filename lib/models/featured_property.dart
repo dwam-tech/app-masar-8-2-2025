@@ -15,7 +15,7 @@ class FeaturedProperty {
   final String paymentMethod;
   final String area;
   final bool isReady;
-  final bool theBest;
+  final bool isFeatured;
   final String createdAt;
   final PropertyProvider provider;
 
@@ -34,7 +34,7 @@ class FeaturedProperty {
     required this.paymentMethod,
     required this.area,
     required this.isReady,
-    required this.theBest,
+    required this.isFeatured,
     required this.createdAt,
     required this.provider,
   });
@@ -58,7 +58,7 @@ class FeaturedProperty {
       paymentMethod: json['payment_method'] ?? '',
       area: json['area'] ?? '',
       isReady: json['is_ready'] ?? false,
-      theBest: json['the_best'] ?? false,
+      isFeatured: json['is_featured'] ?? false,
       createdAt: json['created_at'] ?? '',
       provider: PropertyProvider.fromJson(json['provider'] ?? {}),
     );
@@ -80,7 +80,7 @@ class FeaturedProperty {
       'payment_method': paymentMethod,
       'area': area,
       'is_ready': isReady,
-      'the_best': theBest,
+      'is_featured': isFeatured,
       'created_at': createdAt,
       'provider': provider.toJson(),
     };
@@ -141,13 +141,33 @@ class FeaturedPropertiesResponse {
   });
 
   factory FeaturedPropertiesResponse.fromJson(Map<String, dynamic> json) {
+    // يدعم كلا التنسيقين: {data, links, meta} و {properties, pagination}
+    if (json.containsKey('data')) {
+      return FeaturedPropertiesResponse(
+        status: json['status'] ?? false,
+        data: (json['data'] as List<dynamic>?)
+                ?.map((item) => FeaturedProperty.fromJson(item))
+                .toList() ?? [],
+        links: PaginationLinks.fromJson(json['links'] ?? {}),
+        meta: PaginationMeta.fromJson(json['meta'] ?? {}),
+      );
+    }
+
+    final properties = (json['properties'] as List<dynamic>?)
+            ?.map((item) => FeaturedProperty.fromJson(item))
+            .toList() ?? [];
+    final pagination = (json['pagination'] as Map<String, dynamic>? ?? {});
+
     return FeaturedPropertiesResponse(
       status: json['status'] ?? false,
-      data: (json['data'] as List<dynamic>?)
-          ?.map((item) => FeaturedProperty.fromJson(item))
-          .toList() ?? [],
-      links: PaginationLinks.fromJson(json['links'] ?? {}),
-      meta: PaginationMeta.fromJson(json['meta'] ?? {}),
+      data: properties,
+      links: PaginationLinks(),
+      meta: PaginationMeta(
+        currentPage: pagination['current_page'] ?? 1,
+        lastPage: pagination['last_page'] ?? 1,
+        perPage: pagination['per_page'] ?? properties.length,
+        total: pagination['total'] ?? properties.length,
+      ),
     );
   }
 }
@@ -177,16 +197,22 @@ class PaginationLinks {
 
 class PaginationMeta {
   final int currentPage;
+  final int lastPage;
+  final int perPage;
   final int total;
 
   PaginationMeta({
     required this.currentPage,
+    required this.lastPage,
+    required this.perPage,
     required this.total,
   });
 
   factory PaginationMeta.fromJson(Map<String, dynamic> json) {
     return PaginationMeta(
       currentPage: json['current_page'] ?? 1,
+      lastPage: json['last_page'] ?? 1,
+      perPage: json['per_page'] ?? 0,
       total: json['total'] ?? 0,
     );
   }

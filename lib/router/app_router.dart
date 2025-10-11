@@ -123,6 +123,12 @@ class AppRouter {
               return '/driver-home';
             }
           }
+          // توجيه حسابات العقارات (مكتب/فرد) لواجهة العقارات
+          else if (userType == 'real_estate_office' || userType == 'real_estate_individual') {
+            if (state.uri.toString() == '/SplashScreen' || state.uri.toString() == '/login') {
+              return '/RealStateHomeScreen';
+            }
+          }
           // توجيه مالكي السيارات لصفحة التأجير
           else if (userType == 'car_rental_owner') {
             if (state.uri.toString() == '/SplashScreen' || state.uri.toString() == '/login') {

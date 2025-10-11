@@ -36,7 +36,8 @@ class FeaturedPropertiesProvider with ChangeNotifier {
       _featuredProperties = response.data;
       _currentPage = response.meta.currentPage;
       _totalProperties = response.meta.total;
-      _hasMoreData = response.links.next != null;
+      // تحديد وجود صفحات إضافية بناءً على lastPage
+      _hasMoreData = response.meta.currentPage < response.meta.lastPage;
 
       print('✅ تم جلب ${_featuredProperties.length} عقار مميز');
       
@@ -61,7 +62,7 @@ class FeaturedPropertiesProvider with ChangeNotifier {
       
       _featuredProperties.addAll(response.data);
       _currentPage = response.meta.currentPage;
-      _hasMoreData = response.links.next != null;
+      _hasMoreData = response.meta.currentPage < response.meta.lastPage;
 
       print('✅ تم تحميل ${response.data.length} عقار إضافي');
       

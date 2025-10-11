@@ -94,7 +94,7 @@ class FeaturedPropertyCard extends StatelessWidget {
                   ),
                   
                   // شارة "الأفضل"
-                  if (property.theBest)
+                  if (property.isFeatured)
                     Positioned(
                       top: 12,
                       right: 12,

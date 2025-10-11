@@ -387,7 +387,7 @@ class _FeaturedPropertiesScreenState extends State<FeaturedPropertiesScreen> {
                   ),
                   
                   // شارة "الأفضل"
-                  if (property.theBest)
+                  if (property.isFeatured)
                     Positioned(
                       top: 16,
                       right: 16,

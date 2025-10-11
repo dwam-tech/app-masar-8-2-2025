@@ -15,11 +15,10 @@ class FeaturedPropertiesService {
   }) async {
     try {
       final query = <String, String>{
-        'the_best': '1',
-        if (page > 1) 'page': page.toString(),
+        'page': page.toString(),
       };
 
-      final url = Uri.parse('$baseUrl/api/public-properties')
+      final url = Uri.parse('$baseUrl/api/properties/featured')
           .replace(queryParameters: query);
 
       print('🏠 جلب العقارات المميزة من: $url');
@@ -37,38 +36,68 @@ class FeaturedPropertiesService {
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
-        
-        // التحقق من وجود البيانات في التنسيق الصحيح
-        if (jsonData is Map<String, dynamic> && jsonData.containsKey('data')) {
-          return FeaturedPropertiesResponse.fromJson(jsonData);
-        } else {
-          // إذا كانت البيانات في تنسيق مختلف، نحاول التعامل معها
-          final List<dynamic> propertiesData = jsonData is List ? jsonData : [];
-          final List<FeaturedProperty> properties = [];
-          
-          for (var item in propertiesData) {
-            try {
-              properties.add(FeaturedProperty.fromJson(item as Map<String, dynamic>));
-            } catch (e) {
-              print('❌ خطأ في تحليل عقار مميز: $e');
-            }
-          }
-          
+
+        // التنسيق الرسمي من لارافيل: { status, properties: [], pagination: { current_page, last_page, per_page, total } }
+        if (jsonData is Map<String, dynamic> && jsonData.containsKey('properties')) {
+          final List<dynamic> propertiesData = jsonData['properties'] as List<dynamic>? ?? [];
+          final List<FeaturedProperty> properties = propertiesData
+              .map((item) => FeaturedProperty.fromJson(item as Map<String, dynamic>))
+              .toList();
+
+          final pagination = (jsonData['pagination'] as Map<String, dynamic>? ?? {});
+
           return FeaturedPropertiesResponse(
-            status: true,
+            status: jsonData['status'] == true,
             data: properties,
             links: PaginationLinks(
               first: null,
               last: null,
               prev: null,
-              next: null,
+              next: (pagination['current_page'] ?? 1) < (pagination['last_page'] ?? 1)
+                  ? '$baseUrl/api/properties/featured?page=${(pagination['current_page'] ?? 1) + 1}'
+                  : null,
             ),
             meta: PaginationMeta(
-              currentPage: page,
-              total: properties.length,
+              currentPage: pagination['current_page'] ?? page,
+              lastPage: pagination['last_page'] ?? 1,
+              perPage: pagination['per_page'] ?? 20,
+              total: pagination['total'] ?? properties.length,
             ),
           );
         }
+
+        // دعم تنسيقات بديلة تاريخية { data, links, meta } أو قائمة مباشرة
+        if (jsonData is Map<String, dynamic> && jsonData.containsKey('data')) {
+          return FeaturedPropertiesResponse.fromJson(jsonData);
+        }
+
+        // تنسيق احتياطي إذا كانت الاستجابة قائمة مباشرة
+        final List<dynamic> propertiesData = jsonData is List ? jsonData : [];
+        final List<FeaturedProperty> properties = [];
+        for (var item in propertiesData) {
+          try {
+            properties.add(FeaturedProperty.fromJson(item as Map<String, dynamic>));
+          } catch (e) {
+            print('❌ خطأ في تحليل عقار مميز: $e');
+          }
+        }
+
+        return FeaturedPropertiesResponse(
+          status: true,
+          data: properties,
+          links: PaginationLinks(
+            first: null,
+            last: null,
+            prev: null,
+            next: null,
+          ),
+          meta: PaginationMeta(
+            currentPage: page,
+            lastPage: 1,
+            perPage: properties.length,
+            total: properties.length,
+          ),
+        );
       } else {
         final errorData = json.decode(response.body);
         throw Exception(errorData['message'] ?? 'فشل في جلب العقارات المميزة: ${response.statusCode}');

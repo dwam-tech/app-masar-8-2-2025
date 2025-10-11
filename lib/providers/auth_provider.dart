@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer';
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
@@ -360,19 +361,20 @@ class AuthProvider with ChangeNotifier {
 
   Future<void> fetchMyProperties() async {
     if (!isLoggedIn) {
-      debugPrint("AuthProvider FETCH: User is not logged in. Aborting fetch.");
+      log('[AuthProvider] fetchMyProperties: User not logged in. Aborting.');
       return;
     }
 
+    log('[AuthProvider] fetchMyProperties: Fetching my properties...');
     _isLoading = true;
     notifyListeners();
 
     try {
       final fetchedProperties = await _propertyService.getMyProperties();
       _properties = fetchedProperties;
-      debugPrint("AuthProvider FETCH: Successfully loaded ${_properties.length} properties");
+      log('[AuthProvider] fetchMyProperties: Successfully fetched ${_properties.length} properties.');
     } catch (error) {
-      debugPrint("AuthProvider FETCH: An error occurred while fetching properties: $error");
+      log('[AuthProvider] fetchMyProperties: FAILED with error - ${error.toString()}');
       _properties = [];
       
       // يمكن إضافة معالجة أخطاء أكثر تفصيلاً هنا إذا لزم الأمر
@@ -395,30 +397,58 @@ class AuthProvider with ChangeNotifier {
     required String paymentMethod,
     required String area,
     required bool isReady,
+    required String currency,
+    required String ownershipType,
+    required double latitude,
+    required double longitude,
   }) async {
     _isLoading = true;
     notifyListeners();
     try {
-      final String imageUrl = await _imageUploadService.uploadImage(imageFile);
+      final Map<String, dynamic> propertyDataLog = {
+        'address': address,
+        'type': type,
+        'price': price,
+        'description': description,
+        'imageFile': imageFile.path,
+        'bedrooms': bedrooms,
+        'bathrooms': bathrooms,
+        'view': view,
+        'paymentMethod': paymentMethod,
+        'area': area,
+        'isReady': isReady,
+        'contactPhone': userPhone,
+        'currency': currency,
+        'ownershipType': ownershipType,
+        'latitude': latitude,
+        'longitude': longitude,
+      };
+      log('[AuthProvider] addProperty: Sending data - ${propertyDataLog.toString()}');
       final newProperty = await _propertyService.addProperty(
         address: address,
         type: type,
         price: price,
         description: description,
-        imageUrl: imageUrl,
+        imageFile: imageFile,
         bedrooms: bedrooms,
         bathrooms: bathrooms,
         view: view,
         paymentMethod: paymentMethod,
         area: area,
         isReady: isReady,
+        contactPhone: userPhone,
+        currency: currency,
+        ownershipType: ownershipType,
+        latitude: latitude,
+        longitude: longitude,
       );
       _properties.insert(0, newProperty);
+      log('[AuthProvider] addProperty: Successfully added property with ID: ${newProperty.id}');
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (error) {
-      debugPrint("AuthProvider: Error during add property process: $error");
+      log('[AuthProvider] addProperty: FAILED with error - ${error.toString()}');
       _isLoading = false;
       notifyListeners();
       return false;
@@ -438,17 +468,19 @@ class AuthProvider with ChangeNotifier {
         final newImageUrl = await _imageUploadService.uploadImage(newImageFile);
         propertyDataToSend['image_url'] = newImageUrl;
       }
+      log('[AuthProvider] updateProperty: Sending data - ${propertyDataToSend.toString()}');
       final savedProperty = await _propertyService.updateProperty(
           updatedProperty.id, propertyDataToSend);
       final index = _properties.indexWhere((p) => p.id == savedProperty.id);
       if (index != -1) {
         _properties[index] = savedProperty;
       }
+      log('[AuthProvider] updateProperty: Successfully updated property ID: ${savedProperty.id}');
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (error) {
-      debugPrint("AuthProvider: Error updating property: $error");
+      log('[AuthProvider] updateProperty: FAILED with error - ${error.toString()}');
       _isLoading = false;
       notifyListeners();
       return false;
@@ -459,13 +491,15 @@ class AuthProvider with ChangeNotifier {
     _isLoading = true;
     notifyListeners();
     try {
+      log('[AuthProvider] deleteProperty: Sending delete request for ID: $propertyId');
       await _propertyService.deleteProperty(propertyId);
       _properties.removeWhere((p) => p.id == propertyId);
+      log('[AuthProvider] deleteProperty: Successfully deleted property ID: $propertyId');
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (error) {
-      debugPrint("AuthProvider: Error deleting property: $error");
+      log('[AuthProvider] deleteProperty: FAILED with error - ${error.toString()}');
       _isLoading = false;
       notifyListeners();
       return false;
@@ -750,6 +784,7 @@ class AuthProvider with ChangeNotifier {
     _appointmentsError = null;
     notifyListeners();
     try {
+      log('[AuthProvider] fetchAppointments: Fetching my appointments...');
       // استخدام endpoint موجود مؤقتاً حتى يتم إضافة الـ route الجديد
       final url = Uri.parse('${AppConstants.apiBaseUrl}/appointments');
       final response = await http.get(
@@ -783,7 +818,7 @@ class AuthProvider with ChangeNotifier {
           // ترتيب المواعيد من الأجدد للأقدم
           // الترتيب حسب تاريخ الإنشاء (الأحدث أولاً)
           _appointments.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          debugPrint("تم جلب وترتيب المواعيد: ${_appointments.length} موعد، من الأجدد للأقدم");
+          log('[AuthProvider] fetchAppointments: Successfully fetched ${_appointments.length} appointments.');
         } else {
           _appointmentsError = 'Invalid response format from server';
           _appointments = [];
@@ -791,12 +826,12 @@ class AuthProvider with ChangeNotifier {
       } else {
         _appointmentsError =
             'Failed to load appointments. Status code: ${response.statusCode}';
-        debugPrint("Failed to fetch appointments. Status: ${response.statusCode}, Body: ${response.body}");
+        log('[AuthProvider] fetchAppointments: FAILED - status ${response.statusCode} - ${response.body}');
         _appointments = [];
       }
     } catch (error) {
       _appointmentsError = 'An error occurred: ${error.toString()}';
-      debugPrint("Error fetching appointments: $error");
+      log('[AuthProvider] fetchAppointments: FAILED with error - ${error.toString()}');
       _appointments = [];
     } finally {
       _isFetchingAppointments = false;
